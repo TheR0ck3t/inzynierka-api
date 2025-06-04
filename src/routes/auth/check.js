@@ -35,9 +35,6 @@ router.get('/', async (req, res) => {
         last_name: user.last_name
       }
     });
-
-    console.log('Użytkownik jest zalogowany:', user.email);
-    
   } catch (error) {
     console.error('Błąd weryfikacji tokena:', error);
     

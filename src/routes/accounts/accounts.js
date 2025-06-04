@@ -2,12 +2,14 @@ const express = require('express');
 const router = express.Router();
 const db = require('../../modules/dbModules/db'); // Import bazy danych
 const authToken = require('../../modules/authModules/authToken')
+const userAuth = require('../../modules/authModules/userAuth'); // Import modułu autoryzacji użytkownika
 
 
 
-router.get('/', (req, res) => {
-    const query = 'SELECT * FROM users';
-    db.any(query)
+router.get('/', authToken, async (req, res) => {
+    const userId = req.user.id
+    const query = 'SELECT * FROM users WHERE ID != $1';
+    db.any(query, [userId])
         .then(data => {
             console.log("Data fetched successfully:", data);
             res.json({
@@ -29,10 +31,23 @@ router.get('/', (req, res) => {
 router.post('/create', authToken, async (req, res) => {
     const { firstName, lastName, email } = req.body;
     console.log("Received data:", { firstName, lastName, email });
+    const generatedPassword = generatePassword();
+    console.log('Generated password: ',generatedPassword);
 
+    const hashedPassword = await userAuth.hashPassword(generatedPassword);
+
+    const userExists = await db.oneOrNone('SELECT * FROM users WHERE email = $1', [email]);
+    if (userExists) {
+        return res.status(400).json({
+            error: 'userAlreadyExists',
+            message: 'Użytkownik z tym adresem e-mail już istnieje!'
+        });
+    }
+
+   
     // Używamy tekstu zapytania z bezpośrednimi parametrami
-    const query =  'INSERT INTO users (first_name, last_name, email) VALUES ($1, $2, $3) RETURNING *'
-    const values =  [firstName, lastName, email]; ;
+    const query =  'INSERT INTO users (first_name, last_name, email, password) VALUES ($1, $2, $3,$4) RETURNING *'
+    const values =  [firstName, lastName, email, hashedPassword]; ;
     try {
         const data = await db.one(query,values);
         console.log("Data inserted successfully:", data);
@@ -51,7 +66,7 @@ router.post('/create', authToken, async (req, res) => {
     }
 });
 
-router.delete('/delete/:id', (req, res) => {
+router.delete('/delete/:id', authToken, async (req, res) => {
     const userId = req.params.id;
     
     db.result('DELETE FROM users WHERE id = $1', [userId])
@@ -81,45 +96,58 @@ router.delete('/delete/:id', (req, res) => {
 
 router.put('/update/', authToken, async (req, res) => {
     const userId = req.user.id;
-console.log("User ID from token:", req.user.id);
     const updates = req.body;
-    
+
     try {
-        // Budujemy dynamiczne zapytanie SQL
-        const fields = Object.keys(updates).filter(field => 
-            ['first_name', 'last_name', 'email'].includes(field)
-        );
-        
-        if (fields.length === 0) {
+        // Obsługa zmiany hasła
+        if (updates.current_password && updates.new_password) {
+            // Pobierz aktualny hash hasła z bazy
+            const user = await db.oneOrNone('SELECT password FROM users WHERE id = $1', [userId]);
+            if (!user) {
+                return res.status(404).json({ status: 'error', message: 'User not found' });
+            }
+            // Porównaj stare hasło
+            const isMatch = await userAuth.comparePasswords(updates.current_password, user.password);
+            if (!isMatch) {
+                return res.status(400).json({ status: 'error', message: 'Nieprawidłowe obecne hasło' });
+            }
+            // Zhashuj nowe hasło
+            const hashedPassword = await userAuth.hashPassword(updates.new_password);
+            // Zaktualizuj hasło w bazie
+            await db.none('UPDATE users SET password = $1 WHERE id = $2', [hashedPassword, userId]);
+            console.log("Password updated successfully for user ID:", userId);
+        }
+
+        // Aktualizacja innych pól (bez haseł)
+        const allowedFields = ['first_name', 'last_name', 'email'];
+        const fields = Object.keys(updates).filter(field => allowedFields.includes(field));
+        if (fields.length > 0) {
+            const setStatements = fields.map((field, index) => `${field} = $${index + 1}`);
+            const query = `UPDATE users SET ${setStatements.join(', ')} WHERE id = $${fields.length + 1} RETURNING *`;
+            const values = [...fields.map(field => updates[field]), userId];
+            const updatedUser = await db.one(query, values);
+            return res.json({
+                status: 'success',
+                message: 'User updated successfully',
+                data: updatedUser
+            });
+        }
+
+        // Jeśli tylko hasło było zmieniane
+        if (updates.current_password && updates.new_password && fields.length === 0) {
+            return res.json({
+                status: 'success',
+                message: 'Password updated successfully',
+            });
+        }
+
+        // Jeśli nie było żadnych pól do aktualizacji
+        if (!updates.current_password && !updates.new_password && fields.length === 0) {
             return res.status(400).json({
                 status: 'error',
                 message: 'No valid fields to update'
             });
         }
-        
-        // Tworzymy części zapytania SET
-        const setStatements = fields.map((field, index) => 
-            `${field} = $${index + 1}`
-        );
-        
-        // Budujemy zapytanie SQL
-        const query = `
-            UPDATE users 
-            SET ${setStatements.join(', ')} 
-            WHERE id = $${fields.length + 1}
-            RETURNING *
-        `;
-        
-        // Przygotowujemy wartości
-        const values = [...fields.map(field => updates[field]), userId];
-        
-        const updatedUser = await db.one(query, values);
-        
-        res.json({
-            status: 'success',
-            message: 'User updated successfully',
-            data: updatedUser
-        });
     } catch (error) {
         console.error("Error updating user:", error);
         res.status(500).json({
@@ -129,6 +157,17 @@ console.log("User ID from token:", req.user.id);
         });
     }
 });
+
+
+ function generatePassword() {
+    var length = 12,
+        charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
+        generatedPassword = "";
+    for (var i = 0, n = charset.length; i < length; ++i) {
+        generatedPassword += charset.charAt(Math.floor(Math.random() * n));
+    }
+    return generatedPassword;
+}
 
 module.exports = {
    path: '/accounts',
