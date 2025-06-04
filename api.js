@@ -8,12 +8,14 @@ const server = http.createServer(app);
 const PORT = process.env.PORT;
 const logger = require('./src/logger'); // Dodanie loggera
 const cors = require('cors');
+const cookieParser = require('cookie-parser');
 
 
 // Middleware: Umożliwienie parsowania JSON i URL-encoded
 app.use(express.json()); // Parsowanie ciała zapytania w formacie JSON
 app.use(express.urlencoded({ extended: true })); // Parsowanie URL-encoded
 
+app.use(cookieParser()); // Parsowanie ciasteczek
 app.use(cors()); // Umożliwienie CORS
 
 // Wczytywanie tras
