@@ -35,13 +35,20 @@ npm install
 
 3. Skopiuj plik `.env.example` do `.env` i skonfiguruj zmienne środowiskowe:
 ```bash
+cp .env.example .env
+```
+
+Następnie edytuj plik `.env` zgodnie z twoją konfiguracją:
+```bash
+# Przykładowa konfiguracja
 PORT=3000
 DB_HOST=localhost
 DB_PORT=5432
 DB_USER=your_username
 DB_PASSWORD=your_password
 DB_NAME=your_database
-JWT_SECRET=your_jwt_secret_key
+JWT_SECRET=your_jwt_secret_key_min_64_characters_long_for_security
+JWT_EXPIRES_IN=1h
 ```
 
 4. Skonfiguruj bazę danych PostgreSQL zgodnie ze schematem projektu.
@@ -66,10 +73,11 @@ API będzie dostępne na `http://localhost:3000`
 src/
 ├── modules/
 │   ├── authModules/        # Moduły autoryzacji
-│   │   ├── authToken.js    # Middleware JWT
 │   │   └── userAuth.js     # Hashowanie i weryfikacja haseł
 │   └── dbModules/
 │       └── db.js           # Konfiguracja bazy danych
+├── middleware/
+│   └── authToken.js        # Middleware JWT
 ├── routes/
 │   ├── accounts/           # Endpointy zarządzania kontami
 │   │   └── accounts.js     # CRUD użytkowników
@@ -77,10 +85,13 @@ src/
 │   │   ├── login.js        # Logowanie
 │   │   ├── logout.js       # Wylogowanie
 │   │   └── check.js        # Sprawdzanie sesji
-│   └── public/
-│       └── test.js         # Publiczne endpointy testowe
-├── logs/                   # Pliki logów
-├── logger.js               # Konfiguracja Winston
+│   └── employees/          # Endpointy zarządzania pracownikami
+│       └── employees.js    # CRUD pracowników
+├── logs/                   # Pliki logów (tworzone automatycznie)
+│   ├── combined.log        # Wszystkie logi
+│   └── error.log           # Tylko błędy
+└── logger.js               # Konfiguracja Winston
+.env.example                # Przykładowy plik konfiguracyjny
 api.js                      # Główny plik aplikacji
 generate-test-user.js       # Skrypt generowania użytkowników testowych
 ```
@@ -88,25 +99,32 @@ generate-test-user.js       # Skrypt generowania użytkowników testowych
 ## 🔐 API Endpointy
 
 ### Autoryzacja
-- `POST /api/auth/login` - Logowanie użytkownika
-- `POST /api/auth/logout` - Wylogowanie użytkownika
-- `GET /api/auth/check` - Sprawdzanie stanu sesji
+- `POST /auth/login` - Logowanie użytkownika
+- `POST /auth/logout` - Wylogowanie użytkownika
+- `GET /auth/check` - Sprawdzanie stanu sesji
 
 ### Zarządzanie kontami
-- `GET /api/accounts/` - Lista wszystkich użytkowników (wymagana autoryzacja)
-- `POST /api/accounts/create` - Tworzenie nowego użytkownika (wymagana autoryzacja)
-- `PUT /api/accounts/update/` - Aktualizacja danych użytkownika (wymagana autoryzacja)
-- `DELETE /api/accounts/delete/:id` - Usunięcie użytkownika (wymagana autoryzacja)
+- `GET /accounts/` - Lista wszystkich użytkowników (wymagana autoryzacja)
+- `POST /accounts/create` - Tworzenie nowego użytkownika (wymagana autoryzacja)
+- `PUT /accounts/update/` - Aktualizacja danych użytkownika (wymagana autoryzacja)
+- `DELETE /accounts/delete/:id` - Usunięcie użytkownika (wymagana autoryzacja)
+
+### Zarządzanie pracownikami
+- `GET /employees/` - Lista wszystkich pracowników (wymagana autoryzacja)
+- `POST /employees/add` - Dodawanie nowego pracownika (wymagana autoryzacja)
+- `PUT /employees/update/` - Aktualizacja danych pracownika (wymagana autoryzacja)
+- `DELETE /employees/delete/:id` - Usunięcie pracownika (wymagana autoryzacja)
 
 ### Publiczne
-- `GET /api/public/test` - Endpoint testowy
+- Brak publicznych endpointów (wszystkie wymagają autoryzacji)
 
 ## 🔒 Autoryzacja
 
 API wykorzystuje JWT (JSON Web Tokens) do autoryzacji:
-- Tokeny są przesyłane w nagłówku `Authorization: Bearer <token>`
-- Middleware `authToken` sprawdza ważność tokenów
-- Hasła są zabezpieczone przez bcrypt z saltRounds=10
+- Tokeny są przesyłane w ciasteczkach HTTP (`token`)
+- Middleware `authToken` sprawdza ważność tokenów dla chronionych endpointów
+- Hasła są zabezpieczone przez bcrypt z saltRounds= `BCRYPT_ROUNDS`
+- Czas wygaśnięcia tokena konfigurowalny przez `JWT_EXPIRES_IN`
 
 
 ## 🗄️ Baza danych
@@ -125,16 +143,28 @@ CREATE TABLE users (
     phone_number VARCHAR(15),
     is_active BOOLEAN DEFAULT FALSE
 );
+```
 
+### Schemat tabeli `employees`
+```sql
+CREATE TABLE employees (
+    employee_id SERIAL PRIMARY KEY,
+    first_name VARCHAR(50) NOT NULL,
+    last_name VARCHAR(50) NOT NULL,
+    dob DATE,
+    employment_date DATE,
+    keycard_id VARCHAR(50) UNIQUE,
+    created_at TIMESTAMP DEFAULT NOW()
+);
 ```
 
 ## 🛡️ Bezpieczeństwo
 
 - **Hashowanie haseł**: bcrypt z salt rounds = 10
-- **JWT**: zabezpieczone tokeny z ekspiracją
+- **JWT**: zabezpieczone tokeny z ekspiracją (konfigurowalny czas przez `JWT_EXPIRES_IN`)
 - **CORS**: skonfigurowane dla cross-origin requests
-- **Walidacja**: express-validator dla validacji danych wejściowych
-- **Zmienne środowiskowe**: wrażliwe dane w pliku .env
+- **Zmienne środowiskowe**: wrażliwe dane zabezpieczone w pliku .env
+- **Middleware autoryzacji**: `authToken` chroni wszystkie endpointy
 
 ## 🔧 Narzędzia deweloperskie
 

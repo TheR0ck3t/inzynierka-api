@@ -39,10 +39,6 @@ const loadRoutes = (dirPath) => {
 };
 
 loadRoutes(routesPath);
-// setupWebSocket(server); // Ustawienie WebSocket
-
-
-
 
 // Start serwera
 server.listen(PORT, () => {

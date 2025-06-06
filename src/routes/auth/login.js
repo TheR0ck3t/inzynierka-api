@@ -60,21 +60,17 @@ router.post('/', async(req, res) => {
         console.log('2FA is not enabled');
 
         // Jeśli 2FA nie jest wymagane, wygeneruj token JWT i kontynuuj
-        const token = jwt.sign({ userId: user.id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '1h' });
+        const token = jwt.sign({ userId: user.id, email: user.email }, process.env.JWT_SECRET, { 
+            expiresIn: process.env.JWT_EXPIRES_IN || '1h' 
+        });
 
         // Ustawienie ciasteczek dla tokena i userId
         res.cookie('token', token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
             sameSite: 'lax',
-            maxAge: 3600000 // 1 godzina
+            maxAge: process.env.SESSION_TIMEOUT // 1 godzina
         });
-        // res.cookie('userId', user.id.toString(), {
-        //     httpOnly: false, // Ustaw na false dla dostępu z frontendu
-        //     secure: process.env.NODE_ENV === 'production', // Ustaw na false dla lokalnego dev
-        //     sameSite: 'lax',
-        //     maxAge: 3600000 // 1 godzina
-        // });
 
         console.log('Cookies set for user:', user.email);
 
