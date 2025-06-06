@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../../modules/dbModules/db'); // Import bazy danych
-const authToken = require('../../modules/authModules/authToken')
+const authToken = require('../../middleware/authToken')
 const userAuth = require('../../modules/authModules/userAuth'); // Import modułu autoryzacji użytkownika
 
 
@@ -11,7 +11,6 @@ router.get('/', authToken, async (req, res) => {
     const query = 'SELECT * FROM users WHERE ID != $1';
     db.any(query, [userId])
         .then(data => {
-            console.log("Data fetched successfully:", data);
             res.json({
                 status: 'success',
                 message: 'Fetched all users successfully',
@@ -30,7 +29,6 @@ router.get('/', authToken, async (req, res) => {
 
 router.post('/create', authToken, async (req, res) => {
     const { firstName, lastName, email } = req.body;
-    console.log("Received data:", { firstName, lastName, email });
     const generatedPassword = generatePassword();
     console.log('Generated password: ',generatedPassword);
 
@@ -50,7 +48,6 @@ router.post('/create', authToken, async (req, res) => {
     const values =  [firstName, lastName, email, hashedPassword]; ;
     try {
         const data = await db.one(query,values);
-        console.log("Data inserted successfully:", data);
         res.json({
             status: 'success',
             message: 'Account created successfully!',
@@ -115,7 +112,6 @@ router.put('/update/', authToken, async (req, res) => {
             const hashedPassword = await userAuth.hashPassword(updates.new_password);
             // Zaktualizuj hasło w bazie
             await db.none('UPDATE users SET password = $1 WHERE id = $2', [hashedPassword, userId]);
-            console.log("Password updated successfully for user ID:", userId);
         }
 
         // Aktualizacja innych pól (bez haseł)
@@ -148,6 +144,7 @@ router.put('/update/', authToken, async (req, res) => {
                 message: 'No valid fields to update'
             });
         }
+        
     } catch (error) {
         console.error("Error updating user:", error);
         res.status(500).json({
@@ -158,10 +155,9 @@ router.put('/update/', authToken, async (req, res) => {
     }
 });
 
-
  function generatePassword() {
     var length = 12,
-        charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
+        charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+[]{}|;:,.<>?`~",
         generatedPassword = "";
     for (var i = 0, n = charset.length; i < length; ++i) {
         generatedPassword += charset.charAt(Math.floor(Math.random() * n));

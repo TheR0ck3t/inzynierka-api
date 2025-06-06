@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const db = require('../dbModules/db');
+const db = require('../modules/dbModules/db');
 
 module.exports = async (req, res, next) => {
   // Pobierz token z ciasteczka
