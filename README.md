@@ -24,7 +24,7 @@ Backend API do systemu zarządzania pracownikami - projekt inżynierski.
 
 1. Sklonuj repozytorium:
 ```bash
-git clone <repository-url>
+git clone https://github.com/TheR0ck3t/inzynierka-api.git
 cd inzynierka-api
 ```
 
