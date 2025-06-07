@@ -5,10 +5,10 @@ const bcrypt = require('bcrypt');
 async function createTestUser() {
   // Dane testowego użytkownika
   const testUser = {
-    email: '',
-    password: '', // To hasło zostanie zaszyfrowane
-    firstName: '',
-    lastName: '',
+    email: 'test@example.com',
+    password: '123', // To hasło zostanie zaszyfrowane
+    firstName: 'Test',
+    lastName: 'Testowy',
     is_active: true
   };
 

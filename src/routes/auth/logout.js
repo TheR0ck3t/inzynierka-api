@@ -12,6 +12,7 @@ router.post('/', (req, res) => {
         status: 'success',
         message: 'Zostałeś wylogowany pomyślnie.'
     });
+
 });
 
 module.exports = {
