@@ -16,7 +16,14 @@ app.use(express.json()); // Parsowanie ciała zapytania w formacie JSON
 app.use(express.urlencoded({ extended: true })); // Parsowanie URL-encoded
 
 app.use(cookieParser()); // Parsowanie ciasteczek
-app.use(cors()); // Umożliwienie CORS
+app.use(cors(
+    {
+        origin: process.env.FRONTEND_URL, // Adres klienta, który ma dostęp do API
+        methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Dozwolone metody
+        allowedHeaders: ['Content-Type', 'Authorization'], // Dozwolone nagłówki
+        credentials: true // Umożliwienie przesyłania ciasteczek
+    }
+)); // Umożliwienie CORS
 
 // Wczytywanie tras
 const routesPath = path.join(__dirname, './src/routes');
