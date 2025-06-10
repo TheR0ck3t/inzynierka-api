@@ -12,6 +12,8 @@ Backend API do systemu zarządzania pracownikami - projekt inżynierski.
 - **bcrypt 6.0.0** - hashowanie haseł
 - **Winston 3.17.0** - logowanie
 - **CORS 2.8.5** - obsługa cross-origin requests
+- **OTPAuth 9.4.0** - obsługa TOTP (2FA)
+- **QRCode 1.5.4** - generowanie kodów QR dla 2FA
 
 ## 📋 Wymagania
 
@@ -41,14 +43,27 @@ cp .env.example .env
 Następnie edytuj plik `.env` zgodnie z twoją konfiguracją:
 ```bash
 # Przykładowa konfiguracja
+
+# Serwer
 PORT=3000
+NODE_ENV=development
+FRONTEND_URL=http://localhost:5173
+
+# Baza danych PostgreSQL
 DB_HOST=localhost
 DB_PORT=5432
 DB_USER=your_username
 DB_PASSWORD=your_password
 DB_NAME=your_database
+
+# JWT i bezpieczeństwo
 JWT_SECRET=your_jwt_secret_key_min_64_characters_long_for_security
 JWT_EXPIRES_IN=1h
+SESSION_TIMEOUT=3600000
+BCRYPT_ROUNDS=10
+
+# 2FA
+COMPANY_NAME="Twoja Firma"
 ```
 
 4. Skonfiguruj bazę danych PostgreSQL zgodnie ze schematem projektu.
@@ -74,6 +89,8 @@ src/
 ├── modules/
 │   ├── authModules/        # Moduły autoryzacji
 │   │   └── userAuth.js     # Hashowanie i weryfikacja haseł
+│   ├── 2faModules/         # Moduły 2FA
+│   │   └── 2fa.js          # TOTP, generowanie QR kodów
 │   └── dbModules/
 │       └── db.js           # Konfiguracja bazy danych
 ├── middleware/
@@ -82,9 +99,10 @@ src/
 │   ├── accounts/           # Endpointy zarządzania kontami
 │   │   └── accounts.js     # CRUD użytkowników
 │   ├── auth/               # Endpointy autoryzacji
-│   │   ├── login.js        # Logowanie
+│   │   ├── login.js        # Logowanie (z obsługą 2FA)
 │   │   ├── logout.js       # Wylogowanie
-│   │   └── check.js        # Sprawdzanie sesji
+│   │   ├── check.js        # Sprawdzanie sesji
+│   │   └── 2fa.js          # Endpointy 2FA (QR kody, weryfikacja)
 │   └── employees/          # Endpointy zarządzania pracownikami
 │       └── employees.js    # CRUD pracowników
 ├── logs/                   # Pliki logów (tworzone automatycznie)
@@ -102,6 +120,8 @@ generate-test-user.js       # Skrypt generowania użytkowników testowych
 - `POST /auth/login` - Logowanie użytkownika
 - `POST /auth/logout` - Wylogowanie użytkownika
 - `GET /auth/check` - Sprawdzanie stanu sesji
+- `POST /auth/2fa/enable` - Dodawanie 2FA
+- `POST /auth/2fa/disable` - Usuwanie 2FA
 
 ### Zarządzanie kontami
 - `GET /accounts/` - Lista wszystkich użytkowników (wymagana autoryzacja)
@@ -185,5 +205,3 @@ tail -f src/logs/combined.log
 - `401` - Unauthorized (brak autoryzacji)
 - `404` - Not Found (nie znaleziono)
 - `500` - Internal Server Error (błąd serwera)
-
- 

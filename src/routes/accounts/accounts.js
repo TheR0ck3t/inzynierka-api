@@ -93,8 +93,9 @@ router.delete('/delete/:id', authToken, async (req, res) => {
 
 router.put('/update/', authToken, async (req, res) => {
     const userId = req.user.id;
+    console.log('User ID:', userId);
     const updates = req.body;
-
+    console.log('Updates received:', updates);
     try {
         // Obsługa zmiany hasła
         if (updates.current_password && updates.new_password) {
@@ -115,8 +116,9 @@ router.put('/update/', authToken, async (req, res) => {
         }
 
         // Aktualizacja innych pól (bez haseł)
-        const allowedFields = ['first_name', 'last_name', 'email'];
+        const allowedFields = ['first_name', 'last_name', 'email', 'phone_number'];
         const fields = Object.keys(updates).filter(field => allowedFields.includes(field));
+        console.log('Fields to update:', fields);
         if (fields.length > 0) {
             const setStatements = fields.map((field, index) => `${field} = $${index + 1}`);
             const query = `UPDATE users SET ${setStatements.join(', ')} WHERE id = $${fields.length + 1} RETURNING *`;
