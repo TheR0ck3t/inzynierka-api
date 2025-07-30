@@ -4,8 +4,23 @@ const db = require('../../modules/dbModules/db'); // Import bazy danych
 const authToken = require('../../middleware/authToken')
 
 router.get('/', authToken, async (req, res) => {
-    const query = 'SELECT employee_id, first_name, last_name, keycard_id FROM employees';
-    db.any(query)
+    const currentUserId = req.user.user_id;
+    // Pobierz employee_id aktualnie zalogowanego użytkownika
+    const currentUserEmployee = await db.oneOrNone('SELECT employee_id FROM users WHERE user_id = $1', [currentUserId]);
+    
+    let query;
+    let params = [];
+    
+    if (currentUserEmployee && currentUserEmployee.employee_id) {
+        // Jeśli zalogowany user ma powiązanego employee, pomiń go z listy
+        query = 'SELECT employee_id, first_name, last_name, keycard_id FROM employees WHERE employee_id != $1';
+        params = [currentUserEmployee.employee_id];
+    } else {
+        // Jeśli nie ma powiązanego employee, pokaż wszystkich
+        query = 'SELECT employee_id, first_name, last_name, keycard_id FROM employees';
+    }
+    
+    db.any(query, params)
         .then(data => {
             res.json({
                 status: 'success',
@@ -74,7 +89,7 @@ router.delete('/delete/:id', authToken, async (req, res) => {
 });
 
 router.put('/update/', authToken, async (req, res) => {
-    const employeeId = req.user.id;
+    const employeeId = req.user.user_id;
     const updates = req.body;
 
     try {
@@ -82,7 +97,7 @@ router.put('/update/', authToken, async (req, res) => {
         const fields = Object.keys(updates).filter(field => allowedFields.includes(field));
         if (fields.length > 0) {
             const setStatements = fields.map((field, index) => `${field} = $${index + 1}`);
-            const query = `UPDATE employees SET ${setStatements.join(', ')} WHERE id = $${fields.length + 1} RETURNING *`;
+            const query = `UPDATE employees SET ${setStatements.join(', ')} WHERE employee_id = $${fields.length + 1} RETURNING *`;
             const values = [...fields.map(field => updates[field]), employeeId];
             const updatedEmployee = await db.one(query, values);
             return res.json({
