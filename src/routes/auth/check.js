@@ -17,8 +17,7 @@ router.get('/', async (req, res) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
     // Sprawdzenie, czy użytkownik istnieje w bazie
-    const user = await db.oneOrNone('SELECT id, email, first_name, last_name FROM users WHERE id = $1', [decoded.userId]);
-    
+    const user = await db.oneOrNone('SELECT * FROM public.user_data WHERE user_id = $1;', [decoded.userId]);
     if (!user) {
       return res.status(200).json({ isAuthenticated: false });
     }
@@ -29,7 +28,7 @@ router.get('/', async (req, res) => {
     return res.status(200).json({
       isAuthenticated: true,
       user: {
-        id: user.id,
+        id: user.user_id,
         email: user.email,
         first_name: user.first_name,
         last_name: user.last_name

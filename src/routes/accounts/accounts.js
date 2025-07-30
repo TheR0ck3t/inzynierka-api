@@ -4,11 +4,15 @@ const db = require('../../modules/dbModules/db'); // Import bazy danych
 const authToken = require('../../middleware/authToken')
 const userAuth = require('../../modules/authModules/userAuth'); // Import modułu autoryzacji użytkownika
 
+// test
+const mailService = require('../../modules/mailingModules/mailService'); // Import modułu mailowego
+//
+
 
 
 router.get('/', authToken, async (req, res) => {
-    const userId = req.user.id
-    const query = 'SELECT * FROM users WHERE ID != $1';
+    const userId = req.user.user_id
+    const query = 'SELECT * FROM user_data WHERE user_id != $1';
     db.any(query, [userId])
         .then(data => {
             res.json({
@@ -34,7 +38,7 @@ router.post('/create', authToken, async (req, res) => {
 
     const hashedPassword = await userAuth.hashPassword(generatedPassword);
 
-    const userExists = await db.oneOrNone('SELECT * FROM users WHERE email = $1', [email]);
+    const userExists = await db.oneOrNone('SELECT user_id FROM user_data WHERE email = $1', [email]);
     if (userExists) {
         return res.status(400).json({
             error: 'userAlreadyExists',
@@ -44,8 +48,8 @@ router.post('/create', authToken, async (req, res) => {
 
    
     // Używamy tekstu zapytania z bezpośrednimi parametrami
-    const query =  'INSERT INTO users (first_name, last_name, email, password) VALUES ($1, $2, $3,$4) RETURNING *'
-    const values =  [firstName, lastName, email, hashedPassword]; ;
+    const query =  'INSERT INTO users (first_name, last_name, email, password) VALUES ($1, $2, $3,$4) RETURNING *';
+    const values =  [firstName, lastName, email, hashedPassword]; 
     try {
         const data = await db.one(query,values);
         res.json({
@@ -53,6 +57,7 @@ router.post('/create', authToken, async (req, res) => {
             message: 'Account created successfully!',
             data: data
         });
+        await mailService.sendWelcomeEmail(email, firstName, lastName, generatedPassword);
     } catch (error) {
         console.error("Error inserting data:", error);
         res.status(500).json({
@@ -66,7 +71,7 @@ router.post('/create', authToken, async (req, res) => {
 router.delete('/delete/:id', authToken, async (req, res) => {
     const userId = req.params.id;
     
-    db.result('DELETE FROM users WHERE id = $1', [userId])
+    db.result('DELETE FROM users WHERE user_id = $1', [userId])
         .then(result => {
             if (result.rowCount > 0) {
                 res.json({
@@ -92,7 +97,7 @@ router.delete('/delete/:id', authToken, async (req, res) => {
 });
 
 router.put('/update/', authToken, async (req, res) => {
-    const userId = req.user.id;
+    const userId = req.user.user_id;
     console.log('User ID:', userId);
     const updates = req.body;
     console.log('Updates received:', updates);
@@ -100,7 +105,7 @@ router.put('/update/', authToken, async (req, res) => {
         // Obsługa zmiany hasła
         if (updates.current_password && updates.new_password) {
             // Pobierz aktualny hash hasła z bazy
-            const user = await db.oneOrNone('SELECT password FROM users WHERE id = $1', [userId]);
+            const user = await db.oneOrNone('SELECT password FROM users WHERE user_id = $1', [userId]);
             if (!user) {
                 return res.status(404).json({ status: 'error', message: 'User not found' });
             }
@@ -112,7 +117,7 @@ router.put('/update/', authToken, async (req, res) => {
             // Zhashuj nowe hasło
             const hashedPassword = await userAuth.hashPassword(updates.new_password);
             // Zaktualizuj hasło w bazie
-            await db.none('UPDATE users SET password = $1 WHERE id = $2', [hashedPassword, userId]);
+            await db.none('UPDATE users SET password = $1 WHERE user_id = $2', [hashedPassword, userId]);
         }
 
         // Aktualizacja innych pól (bez haseł)
@@ -121,7 +126,7 @@ router.put('/update/', authToken, async (req, res) => {
         console.log('Fields to update:', fields);
         if (fields.length > 0) {
             const setStatements = fields.map((field, index) => `${field} = $${index + 1}`);
-            const query = `UPDATE users SET ${setStatements.join(', ')} WHERE id = $${fields.length + 1} RETURNING *`;
+            const query = `UPDATE users SET ${setStatements.join(', ')} WHERE user_id = $${fields.length + 1} RETURNING *`;
             const values = [...fields.map(field => updates[field]), userId];
             const updatedUser = await db.one(query, values);
             return res.json({

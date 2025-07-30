@@ -5,7 +5,7 @@ const bcrypt = require('bcrypt');
 async function createTestUser() {
   // Dane testowego użytkownika
   const testUser = {
-    email: 'test@example.com',
+    email: 'keke.ga@onet.pl',
     password: '123', // To hasło zostanie zaszyfrowane
     firstName: 'Test',
     lastName: 'Testowy',
@@ -14,7 +14,7 @@ async function createTestUser() {
 
   try {
     // Sprawdź, czy użytkownik już istnieje
-    const existingUser = await db.oneOrNone('SELECT * FROM users WHERE email = $1', [testUser.email]);
+    const existingUser = await db.oneOrNone('SELECT * FROM user_data WHERE email = $1', [testUser.email]);
     
     if (existingUser) {
       console.log('Użytkownik testowy już istnieje');
@@ -27,10 +27,10 @@ async function createTestUser() {
     
     // Dodaj użytkownika do bazy danych
     const result = await db.one(`
-      INSERT INTO users (email, password, first_name, last_name, is_active, created_at)
-      VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
-      RETURNING id, email
-    `, [testUser.email, hashedPassword, testUser.firstName, testUser.lastName, testUser.is_active]);
+      INSERT INTO users (email, password, is_active, created_at)
+      VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+      RETURNING user_id, email
+    `, [testUser.email, hashedPassword, testUser.is_active]);
     
     console.log('Utworzono użytkownika testowego:', result);
   } catch (error) {
