@@ -100,6 +100,7 @@ router.post('/rfid/enroll', authToken, async (req, res) => {
             reader: reader,
             sessionId: sessionId
         });
+    logger.info(`Publishing enrollment command to MQTT -> topic: ${topic}, payload: ${command}`);
         
         await new Promise((resolve, reject) => {
             mqttClient.publish(topic, command, { qos: 1 }, (err) => {

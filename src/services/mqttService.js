@@ -28,7 +28,7 @@ class MqttService {
             this.io = io;
             this.isInitialized = true;
 
-            logger.info('MQTT Service initialized successfully');
+            logger.info(`MQTT Service initialized successfully  (broker: ${mqttUrl})`);
 
             return { mqttClient: this.mqttClient, io: this.io };
         } catch (error) {

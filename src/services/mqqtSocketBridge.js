@@ -30,6 +30,7 @@ function setupMqttSocketBridge({ mqttUrl, server, db }) {
                 logger.info('Successfully subscribed to topic: controller/status');
             }
         });
+
         
         // Subskrybuj też rfid topics z kontrolera
         mqttClient.subscribe('rfid/scan', (err) => {
@@ -73,6 +74,7 @@ function setupMqttSocketBridge({ mqttUrl, server, db }) {
                 deviceId = payload.deviceId;
                 uid = payload.uid;
             }
+            
             else if (parts[0] === 'controller' && parts[1] === 'status') {
                 // Handle status messages
                 const statusData = JSON.parse(message);
