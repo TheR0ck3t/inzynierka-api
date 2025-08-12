@@ -3,6 +3,7 @@ const router = express.Router();
 const db = require('../../modules/dbModules/db');
 const jwt = require('jsonwebtoken');
 const { comparePasswords } = require('../../modules/authModules/userAuth');
+const logger = require('../../logger');
 
 // Endpoint do logowania
 router.post('/', async(req, res) => {
@@ -19,6 +20,9 @@ router.post('/', async(req, res) => {
         if (!user) {
             return res.status(401).json({ error: 'Invalid email or password' });
         }
+
+        // Pobierz pełne dane użytkownika z user_data (które zawierają first_name, last_name)
+        const userDetails = await db.oneOrNone('SELECT * FROM public.user_data WHERE user_id = $1', [user.user_id]);
 
         if (!user.is_active) {
             return res.status(401).json({ error: 'User is not active' });
@@ -69,11 +73,13 @@ router.post('/', async(req, res) => {
         } catch (err) {
             // Error updating last login - log silently
         }
-        return res.status(200).json({ message: 'Logged in successfully', user: {
-            first_name: user.first_name,
-            last_name: user.last_name,
+        const responseUser = {
+            first_name: userDetails?.first_name || user.first_name,
+            last_name: userDetails?.last_name || user.last_name,
             email: user.email,
-        } });
+        };
+        logger.info(`User ${user.email} logged in successfully`);
+        return res.status(200).json({ message: 'Logged in successfully', user: responseUser });
     } catch (error) {
         console.error('Error during login process:', error);
         return res.status(500).json({ error: 'Failed to log in' });

@@ -1,5 +1,6 @@
 const qrcode = require('qrcode');
 const { TOTP, Secret } = require('otpauth');
+const logger = require('../../logger');
 
 async function generateSecret(userEmail) {
     try {
@@ -17,7 +18,7 @@ async function generateSecret(userEmail) {
             otpauthUrl: totp.toString(), // Zwraca URL do otpauth
         }
     } catch (error) {
-        console.error('Error generating 2FA secret:', error);
+        logger.error(`Error generating 2FA secret: ${error.message}`);
         throw new Error('Failed to generate 2FA secret');
     }
 }
@@ -36,7 +37,7 @@ async function generateQRCode(otpauthUrl) {
         return qrCodeDataUrl;
 
     } catch (error) {
-        console.error('Error generating QR code:', error);
+        logger.error(`Error generating QR code: ${error.message}`);
         throw new Error('Failed to generate QR code');   
     }
 }
@@ -52,7 +53,7 @@ async function verify2FA(secret, token) {
 
         return totp.validate({ token, window: 1 }) !== null;
     } catch (error) {
-        console.error('Error verifying 2FA:', error);
+        logger.error(`Error verifying 2FA: ${error.message}`);
         return false;
     }
 }

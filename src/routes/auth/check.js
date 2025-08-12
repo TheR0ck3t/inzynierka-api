@@ -2,14 +2,15 @@ const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
 const db = require('../../modules/dbModules/db');
+const logger = require('../../logger');
 
 router.get('/', async (req, res) => {
   try {
-    console.log('Sprawdzanie autoryzacji użytkownika...');
     // Pobierz token z ciasteczka
     const token = req.cookies.token;
     
     if (!token) {
+      console.log('No token provided');
       return res.status(200).json({ isAuthenticated: false });
     }
     
@@ -22,8 +23,6 @@ router.get('/', async (req, res) => {
       return res.status(200).json({ isAuthenticated: false });
     }
 
-    console.log('Token zweryfikowany, użytkownik istnieje:', user.email);
-    
     // Token jest ważny i użytkownik istnieje
     return res.status(200).json({
       isAuthenticated: true,
@@ -35,7 +34,7 @@ router.get('/', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Błąd weryfikacji tokena:', error);
+    logger.error(`Token verification error: ${error.message}`);
     
     // Niezależnie od rodzaju błędu, zwracamy status "nie zalogowany"
     return res.status(200).json({ isAuthenticated: false });

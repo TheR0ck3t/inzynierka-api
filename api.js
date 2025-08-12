@@ -10,6 +10,11 @@ const logger = require('./src/logger'); // Dodanie loggera
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 
+// Import serwisów
+const mqttService = require('./src/services/mqttService');
+const webSocketService = require('./src/services/websocket');
+const db = require('./src/modules/dbModules/db'); // Import modułu bazy danych
+
 
 // Middleware: Umożliwienie parsowania JSON i URL-encoded
 app.use(express.json()); // Parsowanie ciała zapytania w formacie JSON
@@ -37,8 +42,10 @@ const loadRoutes = (dirPath) => {
             if (router && routePath) {
                 app.use(routePath, router);
                 const relativePath = path.relative(routesPath, fullPath);
+                logger.info(`Loaded route: ${routeName} at ${routePath} from ${relativePath}`);
                 console.log(`Loaded route: ${routeName}\nPath: ${routePath}\nFrom file: ${relativePath}\n`);
             } else {
+                logger.error(`Error loading route from file: ${fullPath}`);
                 console.log(`Error loading route from file: ${fullPath}`);
             }
         }
@@ -47,7 +54,14 @@ const loadRoutes = (dirPath) => {
 
 loadRoutes(routesPath);
 
+// Inicjalizacja serwisów - użyj MqttService singleton
+const { mqttClient, io } = mqttService.initialize(server);
+
+// Zintegruj dodatkowe funkcje WebSocket
+webSocketService.initialize(io, mqttClient);
+
 // Start serwera
 server.listen(PORT, () => {
+    logger.info(`API server started on port ${PORT}`);
     console.log('API server started on port ' + PORT);
 });

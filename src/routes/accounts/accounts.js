@@ -3,6 +3,7 @@ const router = express.Router();
 const db = require('../../modules/dbModules/db'); // Import bazy danych
 const authToken = require('../../middleware/authToken')
 const userAuth = require('../../modules/authModules/userAuth'); // Import modułu autoryzacji użytkownika
+const logger = require('../../logger');
 
 // test
 const mailService = require('../../modules/mailingModules/mailService'); // Import modułu mailowego
@@ -22,7 +23,7 @@ router.get('/', authToken, async (req, res) => {
             });
         })
         .catch(error => {
-            console.error("Error fetching data:", error);
+            logger.error(`Error fetching users: ${error.message || error}`);
             res.status(500).json({
                 status: 'error',
                 message: 'Failed to fetch users',
@@ -34,7 +35,6 @@ router.get('/', authToken, async (req, res) => {
 router.post('/create', authToken, async (req, res) => {
     const { firstName, lastName, email } = req.body;
     const generatedPassword = generatePassword();
-    console.log('Generated password: ',generatedPassword);
 
     const hashedPassword = await userAuth.hashPassword(generatedPassword);
 
@@ -59,7 +59,7 @@ router.post('/create', authToken, async (req, res) => {
         });
         await mailService.sendWelcomeEmail(email, firstName, lastName, generatedPassword);
     } catch (error) {
-        console.error("Error inserting data:", error);
+        logger.error(`Error creating account: ${error.message || error}`);
         res.status(500).json({
             status: 'error',
             message: 'Failed to create account.',
@@ -87,7 +87,7 @@ router.delete('/delete/:id', authToken, async (req, res) => {
             }
         })
         .catch(error => {
-            console.error("Error deleting user:", error);
+            logger.error(`Error deleting user: ${error.message || error}`);
             res.status(500).json({
                 status: 'error',
                 message: 'Failed to delete user',
@@ -98,9 +98,8 @@ router.delete('/delete/:id', authToken, async (req, res) => {
 
 router.put('/update/', authToken, async (req, res) => {
     const userId = req.user.user_id;
-    console.log('User ID:', userId);
     const updates = req.body;
-    console.log('Updates received:', updates);
+    
     try {
         // Obsługa zmiany hasła
         if (updates.current_password && updates.new_password) {
@@ -123,7 +122,7 @@ router.put('/update/', authToken, async (req, res) => {
         // Aktualizacja innych pól (bez haseł)
         const allowedFields = ['first_name', 'last_name', 'email', 'phone_number'];
         const fields = Object.keys(updates).filter(field => allowedFields.includes(field));
-        console.log('Fields to update:', fields);
+        
         if (fields.length > 0) {
             const setStatements = fields.map((field, index) => `${field} = $${index + 1}`);
             const query = `UPDATE users SET ${setStatements.join(', ')} WHERE user_id = $${fields.length + 1} RETURNING *`;
@@ -153,7 +152,7 @@ router.put('/update/', authToken, async (req, res) => {
         }
         
     } catch (error) {
-        console.error("Error updating user:", error);
+        logger.error(`Error updating user: ${error.message || error}`);
         res.status(500).json({
             status: 'error',
             message: 'Failed to update user',

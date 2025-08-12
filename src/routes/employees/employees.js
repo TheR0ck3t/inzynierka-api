@@ -3,7 +3,7 @@ const router = express.Router();
 const db = require('../../modules/dbModules/db'); // Import bazy danych
 const authToken = require('../../middleware/authToken')
 
-router.get('/', authToken, async (req, res) => {
+router.get('/list', authToken, async (req, res) => {
     const currentUserId = req.user.user_id;
     // Pobierz employee_id aktualnie zalogowanego użytkownika
     const currentUserEmployee = await db.oneOrNone('SELECT employee_id FROM users WHERE user_id = $1', [currentUserId]);
@@ -83,6 +83,27 @@ router.delete('/delete/:id', authToken, async (req, res) => {
             res.status(500).json({
                 status: 'error',
                 message: 'Failed to delete Employee',
+                error: error.message || error
+            });
+        });
+});
+
+router.get('/:id', authToken, async (req, res) => {
+    const employeeId = req.params.id;
+
+    db.one('SELECT * FROM employees WHERE employee_id = $1', [employeeId])
+        .then(data => {
+            res.json({
+                status: 'success',
+                message: 'Fetched employee successfully',
+                data: data
+            });
+        })
+        .catch(error => {
+            console.error("Error fetching employee:", error);
+            res.status(500).json({
+                status: 'error',
+                message: 'Failed to fetch employee',
                 error: error.message || error
             });
         });

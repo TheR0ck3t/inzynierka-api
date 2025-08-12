@@ -16,14 +16,14 @@ const logger = createLogger({
         timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }), // formatowanie czasu
         logFormat // niestandardowy format
     ),
-    defaultMeta: { service: 'user-service' },
+    defaultMeta: { service: 'api' },
     transports: [
         new transports.File({
-            filename: path.join(__dirname, 'logs', 'error.log'),
+            filename: path.join(__dirname, '../logs', 'error.log'),
             level: 'error',
         }),
         new transports.File({
-            filename: path.join(__dirname, 'logs', 'combined.log'),
+            filename: path.join(__dirname, '../logs', 'combined.log'),
         }),
     ],
 });

@@ -1,5 +1,6 @@
 // Konfiguracja nodemailer
 const nodemailer = require('nodemailer');
+const logger = require('../../logger');
 
 // Konfiguracja transportera email
 const createTransporter = () => {
@@ -40,11 +41,7 @@ const sendEmail = async (to, subject, html, text = null) => {
 
     const info = await transporter.sendMail(mailOptions);
     
-    console.log('Email sent successfully:', {
-      messageId: info.messageId,
-      to: to,
-      subject: subject
-    });
+    logger.info(`Email sent to ${to}: ${subject} (${info.messageId})`);
 
     return {
       success: true,
@@ -53,7 +50,7 @@ const sendEmail = async (to, subject, html, text = null) => {
     };
     
   } catch (error) {
-    console.error('Error sending email:', error);
+    logger.error(`Error sending email: ${error.message}`);
     throw new Error(`Failed to send email: ${error.message}`);
   }
 };
@@ -63,10 +60,10 @@ const testConnection = async () => {
   try {
     const transporter = createTransporter();
     await transporter.verify();
-    console.log('Email server connection successful');
+    logger.info('Email server connection successful');
     return true;
   } catch (error) {
-    console.error('Email server connection failed:', error);
+    logger.error(`Email server connection failed: ${error.message}`);
     return false;
   }
 };
