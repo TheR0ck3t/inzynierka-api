@@ -1,248 +1,152 @@
 const logger = require('../logger');
+const { setupRfidControllerNamespace, sendToESP, triggerCardScan } = require('./rfidControllerWebsocket');
 
-class WebSocketService {
-    constructor() {
-        this.io = null;
-        this.mqttClient = null;
-        this.connectedClients = new Map(); // Przechowuje informacje o podłączonych klientach
+let io = null;
+let mqttClient = null;
+const connectedClients = new Map();
+
+function initialize(socketIo, mqtt) {
+    io = socketIo;
+    mqttClient = mqtt;
+    setupAdditionalHandlers();
+    logger.info('WebSocket service integrated with MQTT Socket Bridge');
+}
+
+function setupAdditionalHandlers() {
+    if (!io) {
+        logger.error('Socket.IO instance not available');
+        return;
     }
-
-    // Integracja z istniejącym MQTT Socket Bridge
-    initialize(io, mqttClient) {
-        this.io = io;
-        this.mqttClient = mqttClient;
-
-        // Dodaj dodatkowe handlery do istniejącej instancji Socket.IO
-        this.setupAdditionalHandlers();
-
-        logger.info('WebSocket service integrated with MQTT Socket Bridge');
-    }
-
-    setupAdditionalHandlers() {
-        if (!this.io) {
-            logger.error('Socket.IO instance not available');
-            return;
-        }
-
-        // Dodaj namespace dla ESP32 jeśli potrzebny
-        const espNamespace = this.io.of('/esp');
-        
-        espNamespace.on('connection', (socket) => {
-            logger.info(`ESP32 connected via Socket.IO: ${socket.id}`);
-            this.connectedClients.set(socket.id, { type: 'esp', socket });
-
-            socket.on('card_scanned', (data) => {
-                this.handleCardScanned(data);
+    // Obsługa browserów
+    io.on('connection', (socket) => {
+        if (!connectedClients.has(socket.id)) {
+            connectedClients.set(socket.id, { type: 'browser', socket });
+            socket.on('add_card', (data) => {
+                handleAddCardRequest(data, socket);
             });
-
-            socket.on('status_update', (data) => {
-                this.handleStatusUpdate(data);
+            socket.on('get_status', () => {
+                socket.emit('status', getConnectionStatus());
             });
-
             socket.on('disconnect', () => {
-                logger.info(`ESP32 disconnected: ${socket.id}`);
-                this.connectedClients.delete(socket.id);
-            });
-        });
-
-        // Dodaj dodatkowe eventy do głównego namespace
-        this.io.on('connection', (socket) => {
-            // Sprawdź czy to nie jest już obsługiwane przez mqttSocketBridge
-            if (!this.connectedClients.has(socket.id)) {
-                this.connectedClients.set(socket.id, { type: 'browser', socket });
-
-                // Dodatkowe eventy dla przeglądarki
-                socket.on('add_card', (data) => {
-                    this.handleAddCardRequest(data, socket);
-                });
-
-                socket.on('get_status', () => {
-                    socket.emit('status', this.getConnectionStatus());
-                });
-
-                socket.on('disconnect', () => {
-                    this.connectedClients.delete(socket.id);
-                });
-            }
-        });
-    }
-
-    handleMessage(data, clientType) {
-        switch (data.action) {
-            case 'add_card':
-                this.handleAddCardRequest(data);
-                break;
-            case 'card_scanned':
-                this.handleCardScanned(data);
-                break;
-            case 'ping':
-                this.handlePing(clientType);
-                break;
-            default:
-                logger.warn(`Unknown WebSocket action: ${data.action}`);
-        }
-    }
-
-    handleAddCardRequest(data, socket = null) {
-        // Integracja z istniejącym systemem MQTT
-        if (this.mqttClient && data.deviceId) {
-            logger.info(`Sending scan_card request to device: ${data.deviceId}`);
-            
-            const topic = `controller/${data.deviceId}/mode`;
-            const message = JSON.stringify({ action: 'scan_new_card' });
-            
-            this.mqttClient.publish(topic, message, { qos: 1 }, (err) => {
-                if (err) {
-                    logger.error(`MQTT publish error: ${err.message}`);
-                    if (socket) {
-                        socket.emit('enrollError', { message: 'MQTT publish failed' });
-                    }
-                } else {
-                    if (socket) {
-                        socket.emit('enrollStarted', { deviceId: data.deviceId });
-                    }
-                    logger.info(`Card enrollment started for device: ${data.deviceId}`);
-                }
-            });
-        } else {
-            logger.warn('Cannot send scan_card request - MQTT not available or deviceId missing');
-            if (socket) {
-                socket.emit('enrollError', { message: 'MQTT not available or deviceId missing' });
-            }
-            this.broadcastToBrowsers({ 
-                action: 'error', 
-                message: 'MQTT not available or deviceId missing' 
+                connectedClients.delete(socket.id);
             });
         }
-    }
+    });
+    // Obsługa ESP/kontrolera w osobnym namespace
+    setupRfidControllerNamespace(io, connectedClients, handleCardScanned, handleStatusUpdate);
+}
 
-    async handleCardScanned(data) {
-        try {
-            logger.info(`Card scanned with UID: ${data.uid}`);
-            
-            // TODO: Zapisz w bazie danych
-            // const savedCard = await saveCard(data.uid);
-            
-            // Wyślij informację do wszystkich przeglądarek przez Socket.IO
-            this.broadcastToBrowsers({ 
-                action: 'card_added', 
-                uid: data.uid,
-                deviceId: data.deviceId,
-                timestamp: new Date().toISOString()
-            });
-
-        } catch (error) {
-            logger.error('Error handling card scan:', error);
-            this.broadcastToBrowsers({ 
-                action: 'error', 
-                message: 'Failed to process card scan' 
-            });
-        }
-    }
-
-    handleStatusUpdate(data) {
-        logger.info('Device status update:', data);
-        this.broadcastToBrowsers({
-            action: 'device_status',
-            ...data,
-            timestamp: new Date().toISOString()
-        });
-    }
-
-    handlePing(clientType, socket = null) {
-        const pongMessage = { action: 'pong', timestamp: new Date().toISOString() };
-        
-        if (socket) {
-            socket.emit('pong', pongMessage);
-        } else {
-            // Fallback - wyślij do wszystkich
-            this.broadcastToBrowsers(pongMessage);
-        }
-    }
-
-    broadcastToBrowsers(message) {
-        if (!this.io) {
-            logger.warn('Socket.IO not available for broadcasting');
-            return;
-        }
-
-        // Wyślij do głównego namespace (przeglądarki)
-        this.io.emit('broadcast', message);
-        
-        // Wyślij też do konkretnych eventów dla kompatybilności
-        if (message.action) {
-            this.io.emit(message.action, message);
-        }
-        
-        logger.info('Message broadcasted to browsers via Socket.IO:', message);
-    }
-
-    sendToESP(message) {
-        const espClients = Array.from(this.connectedClients.values())
-            .filter(client => client.type === 'esp');
-
-        if (espClients.length > 0) {
-            espClients.forEach(client => {
-                client.socket.emit('command', message);
-            });
-            logger.info('Message sent to ESP32 via Socket.IO:', message);
-            return true;
-        }
-
-        // Fallback - użyj MQTT jeśli ESP nie połączony przez Socket.IO
-        if (this.mqttClient && message.deviceId) {
-            const topic = `controller/${message.deviceId}/command`;
-            this.mqttClient.publish(topic, JSON.stringify(message), { qos: 1 });
-            logger.info('Message sent to ESP32 via MQTT:', message);
-            return true;
-        }
-
-        logger.warn('Cannot send message to ESP32 - not connected via Socket.IO or MQTT');
-        return false;
-    }
-
-    getConnectionStatus() {
-        const browserClients = Array.from(this.connectedClients.values())
-            .filter(client => client.type === 'browser').length;
-        
-        const espClients = Array.from(this.connectedClients.values())
-            .filter(client => client.type === 'esp').length;
-
-        return {
-            espConnected: espClients > 0,
-            browserCount: browserClients,
-            totalConnections: this.connectedClients.size,
-            mqttConnected: this.mqttClient && this.mqttClient.connected
-        };
-    }
-
-    // Metoda do użycia przez inne moduły - kompatybilność wsteczna
-    triggerCardScan(deviceId = null) {
-        if (deviceId) {
-            return this.sendToESP({ action: 'scan_card', deviceId });
-        }
-        return this.sendToESP({ action: 'scan_card' });
-    }
-
-    // Metoda do powiadamiania o zmianach w systemie
-    notifyCardAdded(cardData) {
-        this.broadcastToBrowsers({
-            action: 'card_added',
-            ...cardData,
-            timestamp: new Date().toISOString()
-        });
-    }
-
-    // Nowa metoda dla integracji z MQTT Bridge
-    notifyDeviceStatus(statusData) {
-        this.broadcastToBrowsers({
-            action: 'device_status',
-            ...statusData,
-            timestamp: new Date().toISOString()
-        });
+function handleMessage(data, clientType) {
+    switch (data.action) {
+        case 'add_card':
+            handleAddCardRequest(data);
+            break;
+        case 'card_scanned':
+            handleCardScanned(data);
+            break;
+        case 'ping':
+            handlePing(clientType);
+            break;
+        default:
+            logger.warn(`Unknown WebSocket action: ${data.action}`);
     }
 }
 
-// Eksport instancji singleton
-const webSocketService = new WebSocketService();
-module.exports = webSocketService;
+function handleAddCardRequest(data, socket = null) {
+    if (mqttClient && data.deviceId) {
+        logger.info(`Sending scan_card request to device: ${data.deviceId}`);
+        const topic = `controller/${data.deviceId}/mode`;
+        const message = JSON.stringify({ action: 'scan_new_card' });
+        mqttClient.publish(topic, message, { qos: 1 }, (err) => {
+            if (err) {
+                logger.error(`MQTT publish error: ${err.message}`);
+                if (socket) {
+                    socket.emit('enrollError', { message: 'MQTT publish failed' });
+                }
+            } else {
+                if (socket) {
+                    socket.emit('enrollStarted', { deviceId: data.deviceId });
+                }
+                logger.info(`Card enrollment started for device: ${data.deviceId}`);
+            }
+        });
+    } else {
+        logger.warn('Cannot send scan_card request - MQTT not available or deviceId missing');
+        if (socket) {
+            socket.emit('enrollError', { message: 'MQTT not available or deviceId missing' });
+        }
+        broadcastToBrowsers({ action: 'error', message: 'MQTT not available or deviceId missing' });
+    }
+}
+
+async function handleCardScanned(data) {
+    try {
+        logger.info(`Card scanned with UID: ${data.uid}`);
+        broadcastToBrowsers({ action: 'card_added', uid: data.uid, deviceId: data.deviceId, timestamp: new Date().toISOString() });
+    } catch (error) {
+        logger.error('Error handling card scan:', error);
+        broadcastToBrowsers({ action: 'error', message: 'Failed to process card scan' });
+    }
+}
+
+function handleStatusUpdate(data) {
+    logger.info('Device status update:', data);
+    broadcastToBrowsers({ action: 'device_status', ...data, timestamp: new Date().toISOString() });
+}
+
+function handlePing(clientType, socket = null) {
+    const pongMessage = { action: 'pong', timestamp: new Date().toISOString() };
+    if (socket) {
+        socket.emit('pong', pongMessage);
+    } else {
+        broadcastToBrowsers(pongMessage);
+    }
+}
+
+function broadcastToBrowsers(message) {
+    if (!io) {
+        logger.warn('Socket.IO not available for broadcasting');
+        return;
+    }
+    io.emit('broadcast', message);
+    if (message.action) {
+        io.emit(message.action, message);
+    }
+    logger.info('Message broadcasted to browsers via Socket.IO:', message);
+}
+
+function getConnectionStatus() {
+    const browserClients = Array.from(connectedClients.values()).filter(client => client.type === 'browser').length;
+    const espClients = Array.from(connectedClients.values()).filter(client => client.type === 'esp').length;
+    return {
+        espConnected: espClients > 0,
+        browserCount: browserClients,
+        totalConnections: connectedClients.size,
+        mqttConnected: mqttClient && mqttClient.connected
+    };
+}
+
+function notifyCardAdded(cardData) {
+    broadcastToBrowsers({ action: 'card_added', ...cardData, timestamp: new Date().toISOString() });
+}
+
+function notifyDeviceStatus(statusData) {
+    broadcastToBrowsers({ action: 'device_status', ...statusData, timestamp: new Date().toISOString() });
+}
+
+module.exports = {
+    initialize,
+    handleMessage,
+    handleAddCardRequest,
+    handleCardScanned,
+    handleStatusUpdate,
+    handlePing,
+    broadcastToBrowsers,
+    getConnectionStatus,
+    notifyCardAdded,
+    notifyDeviceStatus,
+    connectedClients,
+    mqttClient,
+    triggerCardScan: (deviceId) => triggerCardScan(connectedClients, mqttClient, deviceId),
+    sendToESP: (message) => sendToESP(connectedClients, mqttClient, message)
+};

@@ -2,8 +2,9 @@ const mqtt = require('mqtt');
 const { Server } = require('socket.io');
 const logger = require('../logger');
 
-function setupMqttSocketBridge({ mqttUrl, server, db }) {
-    const mqttClient = mqtt.connect(mqttUrl);
+function setupMqttSocketBridge({ mqttUrl, mqttConfig, server, db }) {
+    // Use secure MQTT config if provided, otherwise fallback to URL
+    const mqttClient = mqttConfig ? mqtt.connect(mqttConfig) : mqtt.connect(mqttUrl);
     
     const io = new Server(server, {
         cors: {
@@ -13,7 +14,11 @@ function setupMqttSocketBridge({ mqttUrl, server, db }) {
     });
 
     mqttClient.on('connect', () => {
-        logger.info(`Connected to MQTT broker: ${mqttUrl}`);
+        if (mqttConfig) {
+            logger.info(`Connected to MQTT broker with security: ${mqttConfig.host}:${mqttConfig.port} (user: ${mqttConfig.username})`);
+        } else {
+            logger.info(`Connected to MQTT broker: ${mqttUrl}`);
+        }
         
         mqttClient.subscribe('controller/keyCard/add', (err) => {
             if (err) {
@@ -38,15 +43,6 @@ function setupMqttSocketBridge({ mqttUrl, server, db }) {
                 logger.error(`Failed to subscribe to topic: rfid/scan - ${err.message}`);
             } else {
                 logger.info('Successfully subscribed to topic: rfid/scan');
-            }
-        });
-
-        // Subskrybuj odpowiedzi z kontrolera o dodanych tagach
-        mqttClient.subscribe('rfid/response/add', (err) => {
-            if (err) {
-                logger.error(`Failed to subscribe to topic: rfid/response/add - ${err.message}`);
-            } else {
-                logger.info('Successfully subscribed to topic: rfid/response/add');
             }
         });
 
@@ -83,21 +79,12 @@ function setupMqttSocketBridge({ mqttUrl, server, db }) {
                 // Status nie potrzebuje dalszej obsługi z cardScanned
                 return;
             }
-            else if (parts[0] === 'rfid' && parts[1] === 'response' && parts[2] === 'add') {
-                // Handle RFID tag addition responses from controller
-                const responseData = JSON.parse(message);
-                
-                // Wyślij odpowiedź do wszystkich połączonych klientów WebSocket
-                io.emit('tagAddResponse', responseData);
-                logger.info(`Tag addition response: ${responseData.response} for UID ${responseData.uid}`);
-                return;
-            }
             else if (parts[0] === 'rfid' && parts[1] === 'enrolled') {
                 // Handle new card enrolled from ESP32
                 const enrollData = JSON.parse(message);
-                const { reader, tagId, sessionId } = enrollData;
+                const { reader, tagId, sessionId, newSecret, secretWritten } = enrollData;
                 
-                logger.info(`Received rfid/enrolled: reader=${reader}, tagId=${tagId}, sessionId=${sessionId}`);
+                logger.info(`Received rfid/enrolled: reader=${reader}, tagId=${tagId}, sessionId=${sessionId}, hasSecret=${!!newSecret}, secretWritten=${!!secretWritten}`);
                 
                 // Wyślij zapytanie do API o zapisanie karty
                 const axios = require('axios');
@@ -107,11 +94,18 @@ function setupMqttSocketBridge({ mqttUrl, server, db }) {
                 
                 try {
                     const response = await axios.post(`${apiUrl}/tags/rfid/save`, {
-                        reader: reader,
-                        tagId: tagId,
-                        sessionId: sessionId
+                        headers: {
+                            'x-mqtt-api-key': process.env.MQTT_API_KEY
+                        },
+                        data: {
+                            reader: reader,
+                            tagId: tagId,
+                            sessionId: sessionId,
+                            tagSecret: newSecret, // Dodaj secret do żądania
+                            secretWritten: secretWritten // Informacja czy secret został zapisany na karcie
+                        }
                     });
-                    
+
                     logger.info(`API response success: ${JSON.stringify(response.data)}`);
                     
                     // Wyślij sukces do WebSocket
@@ -119,10 +113,12 @@ function setupMqttSocketBridge({ mqttUrl, server, db }) {
                         success: true,
                         tagId: tagId,
                         reader: reader,
+                        hasSecret: !!newSecret,
+                        secretWritten: !!secretWritten,
                         message: 'Card enrolled successfully'
                     });
                     
-                    logger.info(`Card enrolled successfully: ${tagId} for reader ${reader}`);
+                    logger.info(`Card enrolled successfully: ${tagId} for reader ${reader} with secret (written: ${!!secretWritten})`);
                 } catch (error) {
                     logger.error(`API call failed: ${error.message}`);
                     logger.error(`API response: ${error.response?.status} - ${JSON.stringify(error.response?.data)}`);

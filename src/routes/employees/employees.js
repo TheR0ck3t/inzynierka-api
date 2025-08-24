@@ -91,7 +91,7 @@ router.delete('/delete/:id', authToken, async (req, res) => {
 router.get('/:id', authToken, async (req, res) => {
     const employeeId = req.params.id;
 
-    db.one('SELECT * FROM employees WHERE employee_id = $1', [employeeId])
+    db.one('SELECT * FROM employee_info WHERE employee_id = $1', [employeeId])
         .then(data => {
             res.json({
                 status: 'success',

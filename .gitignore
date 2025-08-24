@@ -5,4 +5,4 @@ Dockerfile
 *.log
 sql
 .sql
-
+generate-test-user.js

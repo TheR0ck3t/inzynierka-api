@@ -1,62 +1,61 @@
-const { setupMqttSocketBridge } = require('./mqqtSocketBridge');
+
+const { setupMqttSocketBridge } = require('./mqttSocketBridge');
 const db = require('../modules/dbModules/db');
 const logger = require('../logger');
 
-class MqttService {
-    constructor() {
-        this.mqttClient = null;
-        this.io = null;
-        this.isInitialized = false;
+let mqttClient = null;
+let io = null;
+let isInitialized = false;
+
+function initialize(server) {
+    if (isInitialized) {
+        logger.warn('MQTT Service already initialized');
+        return { mqttClient, io };
     }
-
-    initialize(server) {
-        if (this.isInitialized) {
-            logger.warn('MQTT Service already initialized');
-            return { mqttClient: this.mqttClient, io: this.io };
-        }
-
-        try {
-            const mqttUrl = process.env.MQTT_BROKER_URL || 'mqtt://localhost:1883';
-            
-            const { mqttClient, io } = setupMqttSocketBridge({
-                mqttUrl,
-                server,
-                db
-            });
-
-            this.mqttClient = mqttClient;
-            this.io = io;
-            this.isInitialized = true;
-
-            logger.info(`MQTT Service initialized successfully  (broker: ${mqttUrl})`);
-
-            return { mqttClient: this.mqttClient, io: this.io };
-        } catch (error) {
-            logger.error(`Failed to initialize MQTT Service: ${error.message}`);
-            throw new Error(`MQTT Service initialization failed: ${error.message}`);
-        }
-    }
-
-    getMqttClient() {
-        if (!this.isInitialized) {
-            throw new Error('MQTT Service not initialized. Call initialize() first.');
-        }
-        return this.mqttClient;
-    }
-
-    getSocketIO() {
-        if (!this.isInitialized) {
-            throw new Error('MQTT Service not initialized. Call initialize() first.');
-        }
-        return this.io;
-    }
-
-    isReady() {
-        return this.isInitialized && this.mqttClient && this.io;
+    try {
+        const mqttConfig = {
+            host: process.env.MQTT_BROKER_HOST || 'localhost',
+            port: process.env.MQTT_BROKER_PORT || 1883,
+            username: process.env.MQTT_CONTROLLER_USERNAME,
+            password: process.env.MQTT_CONTROLLER_PASSWORD,
+            clientId: `api_${Date.now()}`,
+            keepalive: 60,
+            clean: true
+        };
+        const mqttUrl = process.env.MQTT_BROKER_URL || 'mqtt://localhost:1883';
+        const result = setupMqttSocketBridge({ mqttUrl, mqttConfig, server, db });
+        mqttClient = result.mqttClient;
+        io = result.io;
+        isInitialized = true;
+        logger.info(`MQTT Service initialized with security (broker: ${mqttUrl}, user: ${mqttConfig.username})`);
+        return { mqttClient, io };
+    } catch (error) {
+        logger.error(`Failed to initialize MQTT Service: ${error.message}`);
+        throw new Error(`MQTT Service initialization failed: ${error.message}`);
     }
 }
 
-// Singleton instance
-const mqttService = new MqttService();
+function getMqttClient() {
+    if (!isInitialized) {
+        throw new Error('MQTT Service not initialized. Call initialize() first.');
+    }
+    return mqttClient;
+}
 
-module.exports = mqttService;
+function getSocketIO() {
+    if (!isInitialized) {
+        throw new Error('MQTT Service not initialized. Call initialize() first.');
+    }
+    return io;
+}
+
+function isReady() {
+    return isInitialized && mqttClient && io;
+}
+
+module.exports = {
+    initialize,
+    getMqttClient,
+    getSocketIO,
+    isReady
+};

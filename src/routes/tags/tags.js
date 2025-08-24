@@ -4,6 +4,8 @@ const db = require('../../modules/dbModules/db'); // Import bazy danych
 const mqttService = require('../../services/mqttService'); // Import MQTT service
 const logger = require('../../logger');
 const authToken = require('../../middleware/authToken'); // Import middleware auth
+const mqttAuth = require('../../middleware/mqttAuth'); // Import MQTT auth middleware
+const logAccess = require('../../middleware/logAccess'); // Import middleware logAccess
 
 // Tymczasowe przechowywanie danych enrollment
 let enrollmentSessions = new Map();
@@ -28,9 +30,10 @@ router.get('/list', authToken, async (req, res) => {
 
 router.post('/add', authToken, async (req, res) => {
     const tag = req.body.tag;
-    
-    if (!tag) {
-        return res.status(400).json({ message: 'Tag is required' });
+    const tagSecret = req.body.secret;
+
+    if (!tag || !tagSecret) {
+        return res.status(400).json({ message: 'Tag and secret are required' });
     }
 
     try {
@@ -38,7 +41,7 @@ router.post('/add', authToken, async (req, res) => {
         
         if (!existingTag) {
             // Tag nie istnieje, wstaw go
-            await db.query('INSERT INTO tags ("tag_id") VALUES ($1)', [tag]);
+            await db.query('INSERT INTO tags ("tag_id", "tag_secret") VALUES ($1, $2)', [tag, tagSecret]);
             res.status(201).json({ message: 'Tag added successfully' });
         } else {
             // Tag już istnieje
@@ -53,6 +56,8 @@ router.post('/add', authToken, async (req, res) => {
         });
     }
 });
+
+
 
 // Endpoint POST /rfid/enroll - główny endpoint do rozpoczęcia enrollment
 router.post('/rfid/enroll', authToken, async (req, res) => {
@@ -133,10 +138,10 @@ router.post('/rfid/enroll', authToken, async (req, res) => {
 });
 
 // Endpoint do zapisywania nowej karty z enrollment
-router.post('/rfid/save', async (req, res) => {
-    const { reader, tagId, sessionId } = req.body;
+router.post('/rfid/save', mqttAuth , async (req, res) => {
+    const { reader, tagId, sessionId, tagSecret } = req.body;
     
-    logger.info(`Saving RFID card: reader=${reader}, tagId=${tagId}, sessionId=${sessionId}`);
+    logger.info(`Saving RFID card: reader=${reader}, tagId=${tagId}, sessionId=${sessionId}, hasSecret=${!!tagSecret}`);
     
     if (!reader || !tagId) {
         return res.status(400).json({
@@ -172,10 +177,23 @@ router.post('/rfid/save', async (req, res) => {
             if (employeeWithTag && employeeWithTag.employee_id !== parseInt(employeeId)) {
                 throw new Error(`Card is already assigned to another employee`);
             }
+            
+            // Zaktualizuj secret jeśli podano
+            if (tagSecret) {
+                await db.query('UPDATE tags SET tag_secret = $1 WHERE tag_id = $2', [tagSecret, tagId]);
+                logger.info(`Updated secret for existing tag: ${tagId}`);
+            }
         } else {
-            // Tag nie istnieje, dodaj go z employeeId
-            logger.info(`Inserting new tag with employeeId: ${employeeId}`);
-            await db.query('INSERT INTO tags (tag_id, employee_id) VALUES ($1, $2)', [tagId, employeeId]);
+            // Tag nie istnieje, dodaj go z employeeId i secret
+            logger.info(`Inserting new tag with employeeId: ${employeeId} and secret`);
+            const insertQuery = tagSecret 
+                ? 'INSERT INTO tags (tag_id, employee_id, tag_secret) VALUES ($1, $2, $3)'
+                : 'INSERT INTO tags (tag_id, employee_id) VALUES ($1, $2)';
+            const insertParams = tagSecret 
+                ? [tagId, employeeId, tagSecret]
+                : [tagId, employeeId];
+            
+            await db.query(insertQuery, insertParams);
         }
         
         // Przypisz kartę do pracownika
@@ -184,12 +202,13 @@ router.post('/rfid/save', async (req, res) => {
         // Usuń sesję enrollment
         enrollmentSessions.delete(reader);
         
-        logger.info(`Card ${tagId} assigned to employee ${employeeId}`);
+        logger.info(`Card ${tagId} assigned to employee ${employeeId} with secret support`);
         res.json({
             success: true,
             message: 'Card enrolled and assigned successfully',
             tagId: tagId,
-            employeeId: employeeId
+            employeeId: employeeId,
+            hasSecret: !!tagSecret
         });
         
     } catch (error) {
@@ -232,6 +251,133 @@ router.delete('/delete/:tagId', authToken, async (req, res) => {
         res.status(500).json({
             error: 'Database error',
             message: error.message || 'Failed to delete RFID card'
+        });
+    }
+});
+
+router.get('/check-access/:uid', mqttAuth, logAccess , async (req, res) => {
+    const uid = req.params.uid;
+    const providedSecret = req.headers.secret // Secret może być w query lub header
+    
+    console.log(`Checking access for RFID tag: ${uid}, hasSecret: ${!!providedSecret}`);
+    logger.info(`Checking access for RFID tag: ${uid}, hasSecret: ${!!providedSecret}`);
+
+    try {
+        const tag = await db.oneOrNone('SELECT * FROM tags WHERE tag_id = $1', [uid]);
+        
+        if (!tag) {
+            logger.warn(`No tag found for UID: ${uid}`);
+            return res.json({
+                error: 'Not found',
+                response: 'DENIED',
+                reason: 'Tag not registered'
+            });
+        }
+
+        // Sprawdź secret jeśli tag ma przypisany secret
+        if (tag.tag_secret) {
+            if (!providedSecret) {
+                logger.warn(`Tag ${uid} requires secret but none provided`);
+                return res.json({
+                    response: 'DENIED',
+                    reason: 'Secret required'
+                });
+            }
+            
+            if (tag.tag_secret !== providedSecret) {
+                logger.warn(`Invalid secret for tag ${uid}`);
+                return res.json({
+                    response: 'DENIED',
+                    reason: 'Invalid secret'
+                });
+            }
+        }
+
+        // Sprawdź czy tag jest przypisany do aktywnego pracownika
+        if (tag.employee_id) {
+            const employee = await db.oneOrNone('SELECT * FROM employees WHERE employee_id = $1', [tag.employee_id]);
+            
+            if (!employee) {
+                logger.warn(`Tag ${uid} assigned to non-existent employee ${tag.employee_id}`);
+                return res.json({
+                    response: 'DENIED',
+                    reason: 'Employee not found'
+                });
+            }
+            
+            // Możesz dodać tutaj sprawdzenie statusu pracownika (aktywny/nieaktywny)
+            // if (!employee.is_active) { ... }
+        }
+
+        logger.info(`Access granted for tag ${uid}`);
+        res.json({
+            response: "ALLOW",
+            employeeId: tag.employee_id,
+            hasSecret: !!tag.tag_secret
+        });
+        
+    } catch (error) {
+        logger.error(`Error checking access for UID ${uid}: ${error.message || error}`);
+        res.status(500).json({
+            error: 'Database error',
+            response: 'DENIED',
+            message: error.message || 'Failed to check access'
+        });
+    }
+});
+
+// Endpoint do aktualizacji secret istniejącego tagu (uniwersalny - z autoryzacją i bez)
+router.put('/secret-update/:tagId', mqttAuth,  async (req, res) => {
+    const { tagId } = req.params;
+    const { newSecret } = req.body;
+    const isControllerRequest = req.headers['x-controller-request'] === 'true';
+    
+    // Jeśli nie jest to request z kontrolera, sprawdź autoryzację
+    if (!isControllerRequest) {
+        authToken(req, res, () => {
+            // Kontynuuj jeśli autoryzacja przeszła
+        });
+        if (!req.user) {
+            return res.status(401).json({
+                error: 'Unauthorized',
+                message: 'Authentication required'
+            });
+        }
+    }
+    
+    if (!newSecret) {
+        return res.status(400).json({
+            error: 'Missing parameter',
+            message: 'newSecret is required'
+        });
+    }
+    
+    try {
+        const tag = await db.oneOrNone('SELECT * FROM tags WHERE tag_id = $1', [tagId]);
+        
+        if (!tag) {
+            return res.status(404).json({
+                error: 'Tag not found',
+                message: 'Tag does not exist'
+            });
+        }
+        
+        await db.query('UPDATE tags SET tag_secret = $1 WHERE tag_id = $2', [newSecret, tagId]);
+        
+        const actor = isControllerRequest ? 'RFID controller' : `user ${req.user.user_id}`;
+        logger.info(`Secret updated for tag ${tagId} by ${actor}`);
+        
+        res.json({
+            success: true,
+            message: 'Secret updated successfully',
+            tagId: tagId
+        });
+        
+    } catch (error) {
+        logger.error(`Error updating secret for tag ${tagId}: ${error.message}`);
+        res.status(500).json({
+            error: 'Database error',
+            message: 'Failed to update secret'
         });
     }
 });

@@ -13,8 +13,6 @@ const cookieParser = require('cookie-parser');
 // Import serwisów
 const mqttService = require('./src/services/mqttService');
 const webSocketService = require('./src/services/websocket');
-const db = require('./src/modules/dbModules/db'); // Import modułu bazy danych
-
 
 // Middleware: Umożliwienie parsowania JSON i URL-encoded
 app.use(express.json()); // Parsowanie ciała zapytania w formacie JSON
