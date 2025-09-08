@@ -6,7 +6,7 @@ const logger = require('../../logger');
 const authToken = require('../../middleware/authToken'); // Import middleware auth
 const mqttAuth = require('../../middleware/mqttAuth'); // Import MQTT auth middleware
 const logAccess = require('../../middleware/logAccess'); // Import middleware logAccess
-
+const workTimeTracker = require('../../middleware/workTimeTracker'); // Import middleware workTimeTracker
 // Tymczasowe przechowywanie danych enrollment
 let enrollmentSessions = new Map();
 
@@ -255,7 +255,7 @@ router.delete('/delete/:tagId', authToken, async (req, res) => {
     }
 });
 
-router.get('/check-access/:uid', mqttAuth, logAccess , async (req, res) => {
+router.get('/check-access/:uid', mqttAuth, async (req, res) => {
     const uid = req.params.uid;
     const providedSecret = req.headers.secret // Secret może być w query lub header
     
@@ -267,6 +267,8 @@ router.get('/check-access/:uid', mqttAuth, logAccess , async (req, res) => {
         
         if (!tag) {
             logger.warn(`No tag found for UID: ${uid}`);
+            req.accessStatus = 'DENIED';
+            logAccess(req, res, () => {}); // Zaloguj próbę dostępu z nieznanym tagiem
             return res.json({
                 error: 'Not found',
                 response: 'DENIED',
@@ -278,6 +280,8 @@ router.get('/check-access/:uid', mqttAuth, logAccess , async (req, res) => {
         if (tag.tag_secret) {
             if (!providedSecret) {
                 logger.warn(`Tag ${uid} requires secret but none provided`);
+                req.accessStatus = 'DENIED';
+                logAccess(req, res, () => {}); // Zaloguj próbę dostępu bez secret
                 return res.json({
                     response: 'DENIED',
                     reason: 'Secret required'
@@ -286,6 +290,8 @@ router.get('/check-access/:uid', mqttAuth, logAccess , async (req, res) => {
             
             if (tag.tag_secret !== providedSecret) {
                 logger.warn(`Invalid secret for tag ${uid}`);
+                req.accessStatus = 'DENIED';
+                logAccess(req, res, () => {}); // Zaloguj próbę dostępu z nieprawidłowym secret
                 return res.json({
                     response: 'DENIED',
                     reason: 'Invalid secret'
@@ -299,6 +305,8 @@ router.get('/check-access/:uid', mqttAuth, logAccess , async (req, res) => {
             
             if (!employee) {
                 logger.warn(`Tag ${uid} assigned to non-existent employee ${tag.employee_id}`);
+                req.accessStatus = 'DENIED';
+                logAccess(req, res, () => {}); // Zaloguj próbę dostępu z tagiem przypisanym do nieistniejącego pracownika
                 return res.json({
                     response: 'DENIED',
                     reason: 'Employee not found'
@@ -310,12 +318,18 @@ router.get('/check-access/:uid', mqttAuth, logAccess , async (req, res) => {
         }
 
         logger.info(`Access granted for tag ${uid}`);
+
+        req.accessStatus = 'ALLOW';
+        logAccess(req, res, () => {}); // Zaloguj dostęp
+        workTimeTracker(req, res, () => {}); // Śledzenie czasu pracy
+
         res.json({
             response: "ALLOW",
             employeeId: tag.employee_id,
             hasSecret: !!tag.tag_secret
         });
         
+
     } catch (error) {
         logger.error(`Error checking access for UID ${uid}: ${error.message || error}`);
         res.status(500).json({

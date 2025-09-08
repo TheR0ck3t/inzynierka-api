@@ -18,7 +18,7 @@ module.exports = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
     // Pobranie użytkownika z bazy danych
-    const user = await db.oneOrNone('SELECT * FROM user_data WHERE user_id = $1', [decoded.userId]);
+    const user = await db.oneOrNone('SELECT * FROM user_data_department WHERE user_id = $1', [decoded.userId]);
     
     if (!user) {
       return res.status(401).json({ 

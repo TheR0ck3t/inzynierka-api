@@ -1,5 +1,6 @@
 const logger = require('../logger');
 const { setupRfidControllerNamespace, sendToESP, triggerCardScan } = require('./rfidControllerWebsocket');
+const accessLogsWebSocket = require('./accessLogsWebSocket');
 
 let io = null;
 let mqttClient = null;
@@ -34,6 +35,8 @@ function setupAdditionalHandlers() {
     });
     // Obsługa ESP/kontrolera w osobnym namespace
     setupRfidControllerNamespace(io, connectedClients, handleCardScanned, handleStatusUpdate);
+    // Obsługa logów dostępu w osobnym namespace
+    accessLogsWebSocket(io);
 }
 
 function handleMessage(data, clientType) {

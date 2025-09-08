@@ -109,8 +109,8 @@ router.get('/:id', authToken, async (req, res) => {
         });
 });
 
-router.put('/update/', authToken, async (req, res) => {
-    const employeeId = req.user.user_id;
+router.put('/update/:id', authToken, async (req, res) => {
+    const employeeId = req.params.id;
     const updates = req.body;
 
     try {
@@ -121,11 +121,15 @@ router.put('/update/', authToken, async (req, res) => {
             const query = `UPDATE employees SET ${setStatements.join(', ')} WHERE employee_id = $${fields.length + 1} RETURNING *`;
             const values = [...fields.map(field => updates[field]), employeeId];
             const updatedEmployee = await db.one(query, values);
-            return res.json({
+            try {
+                return res.json({
                 status: 'success',
                 message: 'Employee updated successfully',
                 data: updatedEmployee
             });
+            } catch (error) {
+                console.error("Error updating employee:", error);
+            }
         }
 
         // Jeśli nie było żadnych pól do aktualizacji

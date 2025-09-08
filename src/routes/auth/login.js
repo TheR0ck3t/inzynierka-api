@@ -22,12 +22,11 @@ router.post('/', async(req, res) => {
         }
 
         // Pobierz pełne dane użytkownika z user_data (które zawierają first_name, last_name)
-        const userDetails = await db.oneOrNone('SELECT * FROM public.user_data WHERE user_id = $1', [user.user_id]);
+        const userDetails = await db.oneOrNone('SELECT * FROM public.user_data_department WHERE user_id = $1', [user.user_id]);
 
         if (!user.is_active) {
             return res.status(401).json({ error: 'User is not active' });
         }
-
         // Porównanie hasła
         const isMatch = await comparePasswords(password, user.password);
         if (!isMatch) {
@@ -55,7 +54,7 @@ router.post('/', async(req, res) => {
         } 
 
         // Jeśli 2FA nie jest wymagane, wygeneruj token JWT i kontynuuj
-        const token = jwt.sign({ userId: user.user_id, email: user.email }, process.env.JWT_SECRET, { 
+        const token = jwt.sign({ userId: user.user_id, email: user.email, department_name: userDetails?.department_name || null }, process.env.JWT_SECRET, { 
             expiresIn: process.env.JWT_EXPIRES_IN || '1h' 
         });
 
@@ -76,6 +75,7 @@ router.post('/', async(req, res) => {
         const responseUser = {
             first_name: userDetails?.first_name || user.first_name,
             last_name: userDetails?.last_name || user.last_name,
+            department_name: userDetails?.department_name || null,
             email: user.email,
         };
         logger.info(`User ${user.email} logged in successfully`);
