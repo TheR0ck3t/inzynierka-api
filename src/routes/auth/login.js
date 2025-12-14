@@ -3,34 +3,31 @@ const router = express.Router();
 const db = require('../../modules/dbModules/db');
 const jwt = require('jsonwebtoken');
 const { comparePasswords } = require('../../modules/authModules/userAuth');
+const { loginValidation } = require('../../validators');
+const validateRequest = require('../../middleware/validateRequest');
 const logger = require('../../logger');
 
 // Endpoint do logowania
-router.post('/', async(req, res) => {
+router.post('/', loginValidation, validateRequest, async(req, res) => {
     const { email, password, token2fa } = req.body;
-
-    // Walidacja emaila i hasła
-    if (!email || !password) {
-        return res.status(400).json({ error: 'Missing email or password' });
-    }
 
     try {
         // Sprawdzenie, czy użytkownik istnieje i jest aktywny
         const user = await db.oneOrNone('SELECT * FROM users WHERE email = $1', [email]);
         if (!user) {
-            return res.status(401).json({ error: 'Invalid email or password' });
+            return res.status(401).json({ error: 'Niepoprawne dane logowania' });
         }
 
         // Pobierz pełne dane użytkownika z user_data (które zawierają first_name, last_name)
         const userDetails = await db.oneOrNone('SELECT * FROM public.user_data_department WHERE user_id = $1', [user.user_id]);
 
         if (!user.is_active) {
-            return res.status(401).json({ error: 'User is not active' });
+            return res.status(401).json({ error: 'Użytkownik nie jest aktywny' });
         }
         // Porównanie hasła
         const isMatch = await comparePasswords(password, user.password);
         if (!isMatch) {
-            return res.status(401).json({ error: 'Invalid email or password' });
+            return res.status(401).json({ error: 'Niepoprawne dane logowania' });
         }
 
         // Sprawdzenie, czy 2FA jest włączone
@@ -39,7 +36,7 @@ router.post('/', async(req, res) => {
             if (!token2fa) {
                 return res.status(200).json({ 
                     requires2FA: true, 
-                    error: '2FA token is required' 
+                    error: 'Token 2FA jest wymagany' 
                 });
             }
             const { verify2FA } = require('../../modules/2faModules/2fa');
@@ -47,7 +44,7 @@ router.post('/', async(req, res) => {
             if (!is2FAValid) {
                 return res.status(200).json({ 
                     requires2FA: true, 
-                    error: 'Invalid 2FA token' 
+                    error: 'Niepoprawny token 2FA' 
                 });
             }
             // Jeśli token 2FA jest poprawny, kontynuuj logowanie
@@ -70,7 +67,8 @@ router.post('/', async(req, res) => {
         try {
             await db.oneOrNone('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE email = $1', [email]);
         } catch (err) {
-            // Error updating last login - log silently
+            // Błąd podczas aktualizacji ostatniego logowania - loguj cicho
+            logger.warn(`Błąd podczas aktualizacji ostatniego logowania dla użytkownika ${email}: ${err.message}`);
         }
         const responseUser = {
             first_name: userDetails?.first_name || user.first_name,
@@ -82,7 +80,7 @@ router.post('/', async(req, res) => {
         return res.status(200).json({ message: 'Logged in successfully', user: responseUser });
     } catch (error) {
         console.error('Error during login process:', error);
-        return res.status(500).json({ error: 'Failed to log in' });
+        return res.status(500).json({ error: 'Nie udało się zalogować' });
     }
 });
 

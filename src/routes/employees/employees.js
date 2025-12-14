@@ -1,7 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const db = require('../../modules/dbModules/db'); // Import bazy danych
-const authToken = require('../../middleware/authToken')
+const db = require('../../modules/dbModules/db');
+const authToken = require('../../middleware/authToken');
+const { addEmployeeValidation, updateEmployeeValidation, deleteEmployeeValidation, getEmployeeValidation } = require('../../validators');
+const validateRequest = require('../../middleware/validateRequest');
 
 router.get('/list', authToken, async (req, res) => {
     const currentUserId = req.user.user_id;
@@ -38,11 +40,11 @@ router.get('/list', authToken, async (req, res) => {
         });
 });
 
-router.post('/add', authToken, async (req, res) => {
-    const { first_name, last_name, dob, employment_date } = req.body;
+router.post('/add', authToken, addEmployeeValidation, validateRequest,  async (req, res) => {
+    const { first_name, last_name, dob, employment_date, employment_type_id } = req.body;
     // Używamy tekstu zapytania z bezpośrednimi parametrami
-    const query =  'INSERT INTO employees (first_name, last_name, dob, employment_date) VALUES ($1, $2, $3, $4) RETURNING *'
-    const values =  [first_name, last_name, dob, employment_date]; ;
+    const query =  'INSERT INTO employees (first_name, last_name, dob, employment_date, employment_type_id) VALUES ($1, $2, $3, $4, $5) RETURNING *'
+    const values =  [first_name, last_name, dob, employment_date, employment_type_id];
     try {
         const data = await db.one(query,values);
         res.json({
@@ -60,7 +62,7 @@ router.post('/add', authToken, async (req, res) => {
     }
 });
 
-router.delete('/delete/:id', authToken, async (req, res) => {
+router.delete('/delete/:id', authToken, deleteEmployeeValidation, validateRequest, async (req, res) => {
     const employeeId = req.params.id;
     
     db.result('DELETE FROM employees WHERE employee_id = $1', [employeeId])
@@ -88,7 +90,7 @@ router.delete('/delete/:id', authToken, async (req, res) => {
         });
 });
 
-router.get('/:id', authToken, async (req, res) => {
+router.get('/:id', authToken, getEmployeeValidation, validateRequest, async (req, res) => {
     const employeeId = req.params.id;
 
     db.one('SELECT * FROM employee_info WHERE employee_id = $1', [employeeId])
@@ -109,12 +111,12 @@ router.get('/:id', authToken, async (req, res) => {
         });
 });
 
-router.put('/update/:id', authToken, async (req, res) => {
+router.put('/update/:id', authToken, updateEmployeeValidation, validateRequest, async (req, res) => {
     const employeeId = req.params.id;
     const updates = req.body;
 
     try {
-        const allowedFields = ['first_name', 'last_name', 'keycard_id'];
+        const allowedFields = ['first_name', 'last_name', 'keycard_id','employment_type_id', 'department_id', 'job_title'];
         const fields = Object.keys(updates).filter(field => allowedFields.includes(field));
         if (fields.length > 0) {
             const setStatements = fields.map((field, index) => `${field} = $${index + 1}`);

@@ -7,6 +7,8 @@ const authToken = require('../../middleware/authToken'); // Import middleware au
 const mqttAuth = require('../../middleware/mqttAuth'); // Import MQTT auth middleware
 const logAccess = require('../../middleware/logAccess'); // Import middleware logAccess
 const workTimeTracker = require('../../middleware/workTimeTracker'); // Import middleware workTimeTracker
+const { addTagValidation, deleteTagValidation, enrollRfidValidation, updateSecretValidation, saveRfidValidation, checkAccessValidation } = require('../../validators');
+const validateRequest = require('../../middleware/validateRequest');
 // Tymczasowe przechowywanie danych enrollment
 let enrollmentSessions = new Map();
 
@@ -28,7 +30,7 @@ router.get('/list', authToken, async (req, res) => {
     }
 });
 
-router.post('/add', authToken, async (req, res) => {
+router.post('/add', authToken, addTagValidation, validateRequest, async (req, res) => {
     const tag = req.body.tag;
     const tagSecret = req.body.secret;
 
@@ -60,7 +62,7 @@ router.post('/add', authToken, async (req, res) => {
 
 
 // Endpoint POST /rfid/enroll - główny endpoint do rozpoczęcia enrollment
-router.post('/rfid/enroll', authToken, async (req, res) => {
+router.post('/rfid/enroll', authToken, enrollRfidValidation, validateRequest, async (req, res) => {
     const { reader = 'mainEntrance', employeeId } = req.body;
     logger.info(`Starting RFID enrollment for employee: ${employeeId} on reader: ${reader} by user: ${req.user.user_id}`);
 
@@ -138,7 +140,7 @@ router.post('/rfid/enroll', authToken, async (req, res) => {
 });
 
 // Endpoint do zapisywania nowej karty z enrollment
-router.post('/rfid/save', mqttAuth , async (req, res) => {
+router.post('/rfid/save', mqttAuth, saveRfidValidation, validateRequest, async (req, res) => {
     const { reader, tagId, sessionId, tagSecret } = req.body;
     
     logger.info(`Saving RFID card: reader=${reader}, tagId=${tagId}, sessionId=${sessionId}, hasSecret=${!!tagSecret}`);
@@ -220,7 +222,7 @@ router.post('/rfid/save', mqttAuth , async (req, res) => {
     }
 });
 
-router.delete('/delete/:tagId', authToken, async (req, res) => {
+router.delete('/delete/:tagId', authToken, deleteTagValidation, validateRequest, async (req, res) => {
     const { tagId } = req.params;
 
     logger.info(`Deleting RFID card: tagId=${tagId} by user: ${req.user.user_id}`);
@@ -255,7 +257,7 @@ router.delete('/delete/:tagId', authToken, async (req, res) => {
     }
 });
 
-router.get('/check-access/:uid', mqttAuth, async (req, res) => {
+router.get('/check-access/:uid', mqttAuth, checkAccessValidation, validateRequest, async (req, res) => {
     const uid = req.params.uid;
     const providedSecret = req.headers.secret // Secret może być w query lub header
     
@@ -341,7 +343,7 @@ router.get('/check-access/:uid', mqttAuth, async (req, res) => {
 });
 
 // Endpoint do aktualizacji secret istniejącego tagu (uniwersalny - z autoryzacją i bez)
-router.put('/secret-update/:tagId', mqttAuth,  async (req, res) => {
+router.put('/secret-update/:tagId', mqttAuth, updateSecretValidation, validateRequest, async (req, res) => {
     const { tagId } = req.params;
     const { newSecret } = req.body;
     const isControllerRequest = req.headers['x-controller-request'] === 'true';

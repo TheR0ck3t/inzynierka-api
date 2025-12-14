@@ -4,6 +4,8 @@ const db = require('../../modules/dbModules/db'); // Import bazy danych
 const authToken = require('../../middleware/authToken')
 const userAuth = require('../../modules/authModules/userAuth'); // Import modułu autoryzacji użytkownika
 const logger = require('../../logger');
+const { createAccountValidation, updateAccountValidation, deleteAccountValidation } = require('../../validators');
+const validateRequest = require('../../middleware/validateRequest');
 
 // test
 const mailService = require('../../modules/mailingModules/mailService'); // Import modułu mailowego
@@ -32,7 +34,7 @@ router.get('/', authToken, async (req, res) => {
         });
 });
 
-router.post('/create', authToken, async (req, res) => {
+router.post('/create', authToken, createAccountValidation, validateRequest, async (req, res) => {
     const { firstName, lastName, email } = req.body;
     const generatedPassword = generatePassword();
 
@@ -68,7 +70,7 @@ router.post('/create', authToken, async (req, res) => {
     }
 });
 
-router.delete('/delete/:id', authToken, async (req, res) => {
+router.delete('/delete/:id', authToken, deleteAccountValidation, validateRequest, async (req, res) => {
     const userId = req.params.id;
     
     db.result('DELETE FROM users WHERE user_id = $1', [userId])
@@ -96,7 +98,7 @@ router.delete('/delete/:id', authToken, async (req, res) => {
         });
 });
 
-router.put('/update/', authToken, async (req, res) => {
+router.put('/update/', authToken, updateAccountValidation, validateRequest, async (req, res) => {
     const userId = req.user.user_id;
     const updates = req.body;
     

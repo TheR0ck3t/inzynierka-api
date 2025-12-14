@@ -1,0 +1,28 @@
+const express = require('express');
+const router = express.Router();
+const db = require('../../modules/dbModules/db'); // Import bazy danych
+const authToken = require('../../middleware/authToken')
+
+router.get('/list', authToken, async (req, res) => {
+    try {
+        const data = await db.any('SELECT employment_type_id, employment_type_name, employment_type_code, employment_description, employment_min_age FROM employment_types');
+        res.json({
+            status: 'success',
+            message: 'Fetched all employment types successfully',
+            data: data
+        });
+    } catch (error) {
+        console.error("Error fetching data:", error);
+        res.status(500).json({
+            status: 'error',
+            message: 'Failed to fetch employment types',
+            error: error.message || error
+        });
+    }
+});
+
+module.exports = {
+   path: '/employees/employmentTypes',
+    router,
+    routeName: 'employmentTypes' 
+}

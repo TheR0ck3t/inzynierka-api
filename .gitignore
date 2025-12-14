@@ -6,3 +6,4 @@ Dockerfile
 sql
 .sql
 generate-test-user.js
+logs
