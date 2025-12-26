@@ -3,6 +3,7 @@ const router = express.Router();
 const authToken = require('../../middleware/authToken');
 const db = require('../../modules/dbModules/db');
 const logger = require('../../logger');
+const statsScheduler = require('../../services/statsScheduler');
 
 // Statystyki dzienne (ostatnie 7 dni)
 router.get('/daily', authToken, async (req, res) => {
@@ -130,6 +131,41 @@ router.get('/current-employees', authToken, async (req, res) => {
         res.status(500).json({ status: 'error', message: error.message });
     }
 });
+
+// Nieobecni pracownicy (wszyscy którzy nie pracują teraz)
+router.get('/absent-employees', authToken, async (req, res) => {
+    try {
+        // Jeśli widok absent_employees istnieje, użyj go
+        // Jeśli nie - zapytanie działa bezpośrednio
+        const data = await db.any(`
+            SELECT * FROM absent_employees
+            ORDER BY last_seen DESC NULLS LAST
+        `);
+        
+        logger.info('Absent employees fetched:', data.length + ' employees');
+        res.json({ status: 'success', data });
+    } catch (error) {
+        logger.error('Error in absent-employees:', error);
+        res.status(500).json({ status: 'error', message: error.message });
+    }
+});
+
+// Wszyscy pracownicy z ich statusem (pracuje/nieobecny)
+router.get('/all-employees-status', authToken, async (req, res) => {
+    try {
+        const data = await db.any(`
+            SELECT * FROM all_employees_status
+            ORDER BY is_working DESC, shift_start DESC NULLS LAST, last_seen DESC NULLS LAST
+        `);
+        
+        logger.info('All employees status fetched:', data.length + ' employees');
+        res.json({ status: 'success', data });
+    } catch (error) {
+        logger.error('Error in all-employees-status:', error);
+        res.status(500).json({ status: 'error', message: error.message });
+    }
+});
+
 
 module.exports = {
    path: '/work-stats',

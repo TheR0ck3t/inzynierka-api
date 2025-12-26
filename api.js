@@ -13,6 +13,7 @@ const cookieParser = require('cookie-parser');
 // Import serwisów
 const mqttService = require('./src/services/mqttService');
 const webSocketService = require('./src/services/websocket');
+const statsScheduler = require('./src/services/statsScheduler');
 
 // Middleware: Umożliwienie parsowania JSON i URL-encoded
 app.use(express.json()); // Parsowanie ciała zapytania w formacie JSON
@@ -58,8 +59,30 @@ const { mqttClient, io } = mqttService.initialize(server);
 // Zintegruj dodatkowe funkcje WebSocket
 webSocketService.initialize(io, mqttClient);
 
+// Inicjalizacja scheduled jobs dla statystyk
+statsScheduler.init();
+
 // Start serwera
 server.listen(PORT, () => {
     logger.info(`API server started on port ${PORT}`);
     console.log('API server started on port ' + PORT);
+});
+
+// Graceful shutdown
+process.on('SIGINT', () => {
+    logger.info('SIGINT received: closing HTTP server');
+    statsScheduler.stop();
+    server.close(() => {
+        logger.info('HTTP server closed');
+        process.exit(0);
+    });
+});
+
+process.on('SIGTERM', () => {
+    logger.info('SIGTERM received: closing HTTP server');
+    statsScheduler.stop();
+    server.close(() => {
+        logger.info('HTTP server closed');
+        process.exit(0);
+    });
 });

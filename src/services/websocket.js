@@ -1,6 +1,7 @@
 const logger = require('../logger');
 const { setupRfidControllerNamespace, sendToESP, triggerCardScan } = require('./rfidControllerWebsocket');
 const accessLogsWebSocket = require('./accessLogsWebSocket');
+const employeesStatusWebSocket = require('./employeesStatusWebSocket');
 
 let io = null;
 let mqttClient = null;
@@ -37,6 +38,8 @@ function setupAdditionalHandlers() {
     setupRfidControllerNamespace(io, connectedClients, handleCardScanned, handleStatusUpdate);
     // Obsługa logów dostępu w osobnym namespace
     accessLogsWebSocket(io);
+    // Obsługa statusu pracowników w osobnym namespace
+    employeesStatusWebSocket(io);
 }
 
 function handleMessage(data, clientType) {
