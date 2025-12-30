@@ -9,7 +9,7 @@ const logAccess = async (req, res, next) => {
     console.log(`logAccess middleware: UID=${uid}, Reader=${reader}, Status=${status}`);
     
     if (!uid) {
-        logger.warn('No UID provided in request');
+        logger.warn(`No UID provided in request from IP: ${req.ip}`);
         return next();
     }
     
@@ -17,11 +17,20 @@ const logAccess = async (req, res, next) => {
         // Użyj widoku employee_info aby pobrać wszystkie dane naraz
         const employeeInfo = await db.oneOrNone('SELECT * FROM employee_info WHERE tag_id = $1', [uid]);
         
-        console.log(`Logging access for UID: ${uid}, Reader: ${reader}, Status: ${status}`);
+        console.log(`Logging access for UID: ${uid}, Reader:${reader}, Status:${status}`);
+        
+        // Znajdź reader w tabeli readers
+        const readerData = await db.oneOrNone('SELECT * FROM readers WHERE name = $1', [reader]);
+        
+        if (!readerData) {
+            // Jeśli reader nie istnieje, zwróć błąd
+            logger.error(`Reader not found: ${reader}, IP: ${req.ip}`);
+            throw new Error(`Reader '${reader}' not found in database`);
+        }
         
         const result = await db.one(
             'INSERT INTO access_logs (tag_id, reader_id, action, status) VALUES ($1, $2, $3, $4) RETURNING access_id', 
-            [uid, reader, 'access', status]
+            [uid, readerData.reader_id, 'access', status]
         );
         const accessId = result.access_id;
         
@@ -29,7 +38,9 @@ const logAccess = async (req, res, next) => {
         const logData = {
             access_id: accessId,
             tag_id: uid,
-            reader_id: reader,
+            reader_id: readerData.reader_id,
+            reader_name: readerData.name,
+            reader_location: readerData.location,
             timestamp: new Date().toISOString(),
             action: 'access',
             status: status,
@@ -49,7 +60,7 @@ const logAccess = async (req, res, next) => {
         }
         
     } catch (error) {
-        logger.error(`Error logging access: ${error.message}`);
+        logger.error(`Error logging access: ${error.message}, IP: ${req.ip}`);
     }
 
     next();

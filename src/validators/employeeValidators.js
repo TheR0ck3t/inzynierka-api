@@ -1,17 +1,20 @@
 const {body, param} = require('express-validator');
 const db = require('../modules/dbModules/db');
+const { noSQLInjection, strictNumeric } = require('./sqlSanitizer');
 
 const addEmployeeValidation = [
     body('first_name')
         .trim()
         .notEmpty().withMessage('Imię jest wymagane!')
         .isLength({ min: 2, max: 50 }).withMessage('Imię musi mieć od 2 do 50 znaków!')
-        .matches(/^[A-Za-zÀ-ÖØ-öø-ÿ '-]+$/).withMessage('Imię może zawierać tylko litery, spacje, apostrofy i myślniki!'),
+        .matches(/^[A-Za-zÀ-ÖØ-öø-ÿ '-]+$/).withMessage('Imię może zawierać tylko litery, spacje, apostrofy i myślniki!')
+        .custom(noSQLInjection),
     body('last_name')
         .trim()
         .notEmpty().withMessage('Nazwisko jest wymagane!')
         .isLength({ min: 2, max: 50 }).withMessage('Nazwisko musi mieć od 2 do 50 znaków!')
-        .matches(/^[A-Za-zÀ-ÖØ-öø-ÿ '-]+$/).withMessage('Nazwisko może zawierać tylko litery, spacje, apostrofy i myślniki!'),
+        .matches(/^[A-Za-zÀ-ÖØ-öø-ÿ '-]+$/).withMessage('Nazwisko może zawierać tylko litery, spacje, apostrofy i myślniki!')
+        .custom(noSQLInjection),
     body('dob')
         .trim()
         .notEmpty().withMessage('Data urodzenia jest wymagana!')
@@ -68,6 +71,7 @@ const addEmployeeValidation = [
         .trim()
         .notEmpty().withMessage('Typ zatrudnienia jest wymagany!')
         .isInt({ gt: 0 }).withMessage('Typ zatrudnienia musi być dodatnią liczbą całkowitą!')
+        .custom(strictNumeric)
         .custom(async (value) => {
             const employmentType = await db.oneOrNone(
                 'SELECT * FROM employment_types WHERE employment_type_id = $1 AND employment_is_active = true',
@@ -84,24 +88,28 @@ const updateEmployeeValidation = [
     param('id')
         .trim()
         .notEmpty().withMessage('ID pracownika jest wymagane!')
-        .isInt({ gt: 0 }).withMessage('ID pracownika musi być dodatnią liczbą całkowitą!'),
+        .isInt({ gt: 0 }).withMessage('ID pracownika musi być dodatnią liczbą całkowitą!')
+        .custom(strictNumeric),
     body('first_name')
         .optional()
         .trim()
         .notEmpty().withMessage('Imię nie może być puste!')
         .isLength({ min: 2, max: 50 }).withMessage('Imię musi mieć od 2 do 50 znaków!')
-        .matches(/^[A-Za-zÀ-ÖØ-öø-ÿ '-]+$/).withMessage('Imię może zawierać tylko litery, spacje, apostrofy i myślniki!'),
+        .matches(/^[A-Za-zÀ-ÖØ-öø-ÿ '-]+$/).withMessage('Imię może zawierać tylko litery, spacje, apostrofy i myślniki!')
+        .custom(noSQLInjection),
     body('last_name')
         .optional()
         .trim()
         .notEmpty().withMessage('Nazwisko nie może być puste!')
         .isLength({ min: 2, max: 50 }).withMessage('Nazwisko musi mieć od 2 do 50 znaków!')
-        .matches(/^[A-Za-zÀ-ÖØ-öø-ÿ '-]+$/).withMessage('Nazwisko może zawierać tylko litery, spacje, apostrofy i myślniki!'),
+        .matches(/^[A-Za-zÀ-ÖØ-öø-ÿ '-]+$/).withMessage('Nazwisko może zawierać tylko litery, spacje, apostrofy i myślniki!')
+        .custom(noSQLInjection),
     body('employment_type_id')
         .optional()
         .trim()
         .notEmpty().withMessage('Typ zatrudnienia nie może być pusty!')
         .isInt({ gt: 0 }).withMessage('Typ zatrudnienia musi być dodatnią liczbą całkowitą!')
+        .custom(strictNumeric)
         .custom(async (value) => {
             const employmentType = await db.oneOrNone(
                 'SELECT * FROM employment_types WHERE employment_type_id = $1 AND employment_is_active = true',
@@ -119,6 +127,7 @@ const deleteEmployeeValidation = [
         .trim()
         .notEmpty().withMessage('ID pracownika jest wymagane!')
         .isInt({ gt: 0 }).withMessage('ID pracownika musi być dodatnią liczbą całkowitą!')
+        .custom(strictNumeric)
 ];
 
 const getEmployeeValidation = [
@@ -126,6 +135,7 @@ const getEmployeeValidation = [
         .trim()
         .notEmpty().withMessage('ID pracownika jest wymagane!')
         .isInt({ gt: 0 }).withMessage('ID pracownika musi być dodatnią liczbą całkowitą!')
+        .custom(strictNumeric)
 ];
 
 module.exports = {

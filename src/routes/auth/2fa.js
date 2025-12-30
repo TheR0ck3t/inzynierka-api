@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const authToken = require('../../middleware/authToken');
 const db = require('../../modules/dbModules/db');
+const logger = require('../../logger');
 const { generateSecret, generateQRCode, verify2FA  } = require('../../modules/2faModules/2fa.js');
 const { enable2FAValidation, disable2FAValidation } = require('../../validators');
 const validateRequest = require('../../middleware/validateRequest');
@@ -11,6 +12,7 @@ const validateRequest = require('../../middleware/validateRequest');
 
 
 router.post('/enable', authToken, enable2FAValidation, validateRequest, async (req, res) => {
+    logger.info(`Próba włączenia 2FA, użytkownik: ${req.user.email} (ID: ${req.user.user_id}), IP: ${req.ip}`);
     const userId = req.user.user_id;
     try {
         const secretData= await generateSecret(req.user.email);
@@ -32,6 +34,7 @@ router.post('/enable', authToken, enable2FAValidation, validateRequest, async (r
 });
 
 router.post('/disable', authToken, disable2FAValidation, validateRequest, async (req, res) => {
+    logger.info(`Próba wyłączenia 2FA, użytkownik: ${req.user.email} (ID: ${req.user.user_id}), IP: ${req.ip}`);
     const userId = req.user.user_id;
     try {
         // Usuń sekret 2FA z bazy danych

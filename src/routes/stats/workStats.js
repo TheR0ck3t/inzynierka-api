@@ -7,6 +7,7 @@ const statsScheduler = require('../../services/statsScheduler');
 
 // Statystyki dzienne (ostatnie 7 dni)
 router.get('/daily', authToken, async (req, res) => {
+    logger.info(`Próba pobrania statystyk dziennych, użytkownik: ${req.user.email} (ID: ${req.user.user_id}), IP: ${req.ip}`);
     try {
         const data = await db.any(`
             SELECT 
@@ -31,16 +32,17 @@ router.get('/daily', authToken, async (req, res) => {
             avg_hours: parseFloat(row.avg_hours) || 0
         }));
         
-        logger.info('Daily stats fetched:', formattedData.length + ' records');
+        logger.info(`Daily stats fetched: ${formattedData.length} records, IP: ${req.ip}`);
         res.json({ status: 'success', data: formattedData });
     } catch (error) {
-        logger.error('Error in daily stats:', error);
+        logger.error(`Error in daily stats, IP: ${req.ip}:`, error);
         res.status(500).json({ status: 'error', message: error.message });
     }
 });
 
 // Statystyki tygodniowe
 router.get('/weekly', authToken, async (req, res) => {
+    logger.info(`Próba pobrania statystyk tygodniowych, użytkownik: ${req.user.email} (ID: ${req.user.user_id}), IP: ${req.ip}`);
     try {
         const data = await db.any(`
             SELECT 
@@ -71,16 +73,17 @@ router.get('/weekly', authToken, async (req, res) => {
             };
         });
         
-        logger.info('Weekly stats fetched');
+        logger.info(`Weekly stats fetched, IP: ${req.ip}`);
         res.json({ status: 'success', data: formattedData });
     } catch (error) {
-        logger.error('Error in weekly stats:', error);
+        logger.error(`Error in weekly stats, IP: ${req.ip}:`, error);
         res.status(500).json({ status: 'error', message: error.message });
     }
 });
 
 // Statystyki miesięczne (po tygodniach)
 router.get('/monthly', authToken, async (req, res) => {
+    logger.info(`Próba pobrania statystyk miesięcznych, użytkownik: ${req.user.email} (ID: ${req.user.user_id}), IP: ${req.ip}`);
     try {
         const data = await db.any(`
             SELECT 
@@ -101,16 +104,17 @@ router.get('/monthly', authToken, async (req, res) => {
             avg_hours: parseFloat(row.avg_hours) || 0
         }));
         
-        logger.info('Monthly stats fetched:', formattedData.length + ' records');
+        logger.info(`Monthly stats fetched: ${formattedData.length} records, IP: ${req.ip}`);
         res.json({ status: 'success', data: formattedData });
     } catch (error) {
-        logger.error('Error in monthly stats:', error);
+        logger.error(`Error in monthly stats, IP: ${req.ip}:`, error);
         res.status(500).json({ status: 'error', message: error.message });
     }
 });
 
 // Aktualnie pracujący
 router.get('/current-employees', authToken, async (req, res) => {
+    logger.info(`Próba pobrania aktualnie pracujących, użytkownik: ${req.user.email} (ID: ${req.user.user_id}), IP: ${req.ip}`);
     try {
         const data = await db.any(`
             SELECT 
@@ -124,16 +128,17 @@ router.get('/current-employees', authToken, async (req, res) => {
             FROM current_working_employees
         `);
         
-        logger.info('Current employees fetched:', data.length + ' employees');
+        logger.info(`Current employees fetched: ${data.length} employees, IP: ${req.ip}`);
         res.json({ status: 'success', data });
     } catch (error) {
-        logger.error('Error in current-employees:', error);
+        logger.error(`Error in current-employees, IP: ${req.ip}:`, error);
         res.status(500).json({ status: 'error', message: error.message });
     }
 });
 
 // Nieobecni pracownicy (wszyscy którzy nie pracują teraz)
 router.get('/absent-employees', authToken, async (req, res) => {
+    logger.info(`Próba pobrania nieobecnych pracowników, użytkownik: ${req.user.email} (ID: ${req.user.user_id}), IP: ${req.ip}`);
     try {
         // Jeśli widok absent_employees istnieje, użyj go
         // Jeśli nie - zapytanie działa bezpośrednio
@@ -142,26 +147,27 @@ router.get('/absent-employees', authToken, async (req, res) => {
             ORDER BY last_seen DESC NULLS LAST
         `);
         
-        logger.info('Absent employees fetched:', data.length + ' employees');
+        logger.info(`Absent employees fetched: ${data.length} employees, IP: ${req.ip}`);
         res.json({ status: 'success', data });
     } catch (error) {
-        logger.error('Error in absent-employees:', error);
+        logger.error(`Error in absent-employees, IP: ${req.ip}:`, error);
         res.status(500).json({ status: 'error', message: error.message });
     }
 });
 
 // Wszyscy pracownicy z ich statusem (pracuje/nieobecny)
 router.get('/all-employees-status', authToken, async (req, res) => {
+    logger.info(`Próba pobrania statusu wszystkich pracowników, użytkownik: ${req.user.email} (ID: ${req.user.user_id}), IP: ${req.ip}`);
     try {
         const data = await db.any(`
             SELECT * FROM all_employees_status
             ORDER BY is_working DESC, shift_start DESC NULLS LAST, last_seen DESC NULLS LAST
         `);
         
-        logger.info('All employees status fetched:', data.length + ' employees');
+        logger.info(`All employees status fetched: ${data.length} employees, IP: ${req.ip}`);
         res.json({ status: 'success', data });
     } catch (error) {
-        logger.error('Error in all-employees-status:', error);
+        logger.error(`Error in all-employees-status, IP: ${req.ip}:`, error);
         res.status(500).json({ status: 'error', message: error.message });
     }
 });

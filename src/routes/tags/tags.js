@@ -13,6 +13,7 @@ const validateRequest = require('../../middleware/validateRequest');
 let enrollmentSessions = new Map();
 
 router.get('/list', authToken, async (req, res) => {
+    logger.info(`Próba pobrania listy tagów, użytkownik: ${req.user.email} (ID: ${req.user.user_id}), IP: ${req.ip}`);
     try {
         const data = await db.query('SELECT * FROM tags');
         res.json({
@@ -21,7 +22,7 @@ router.get('/list', authToken, async (req, res) => {
             data: data
         });
     } catch (error) {
-        logger.error(`Error fetching tags: ${error.message || error}`);
+        logger.error(`Error fetching tags, IP: ${req.ip}: ${error.message || error}`);
         res.status(500).json({
             status: 'error',
             message: 'Failed to fetch tags',
@@ -31,6 +32,7 @@ router.get('/list', authToken, async (req, res) => {
 });
 
 router.post('/add', authToken, addTagValidation, validateRequest, async (req, res) => {
+    logger.info(`Próba dodania nowego tagu, użytkownik: ${req.user.email} (ID: ${req.user.user_id}), IP: ${req.ip}`);
     const tag = req.body.tag;
     const tagSecret = req.body.secret;
 
@@ -50,7 +52,7 @@ router.post('/add', authToken, addTagValidation, validateRequest, async (req, re
             res.status(400).json({ message: 'Tag already exists' });
         }
     } catch (error) {
-        logger.error(`Error adding tag: ${error.message || error}`);
+        logger.error(`Error adding tag, IP: ${req.ip}: ${error.message || error}`);
         res.status(500).json({
             status: 'error',
             message: 'Failed to add tag.',
@@ -64,7 +66,7 @@ router.post('/add', authToken, addTagValidation, validateRequest, async (req, re
 // Endpoint POST /rfid/enroll - główny endpoint do rozpoczęcia enrollment
 router.post('/rfid/enroll', authToken, enrollRfidValidation, validateRequest, async (req, res) => {
     const { reader = 'mainEntrance', employeeId } = req.body;
-    logger.info(`Starting RFID enrollment for employee: ${employeeId} on reader: ${reader} by user: ${req.user.user_id}`);
+    logger.info(`Próba rozpoczęcia enrollment RFID dla pracownika: ${employeeId} na czytniku: ${reader}, użytkownik: ${req.user.email} (ID: ${req.user.user_id}), IP: ${req.ip}`);
 
     if (!employeeId) {
         return res.status(400).json({
@@ -95,7 +97,7 @@ router.post('/rfid/enroll', authToken, enrollRfidValidation, validateRequest, as
         // Ustaw timeout dla sesji (30 sekund)
         setTimeout(() => {
             if (enrollmentSessions.has(reader)) {
-                logger.warn(`Enrollment session timeout for reader: ${reader}`);
+                logger.warn(`Enrollment session timeout for reader: ${reader}, IP: ${req.ip}`);
                 enrollmentSessions.delete(reader);
             }
         }, 30000);
@@ -112,7 +114,7 @@ router.post('/rfid/enroll', authToken, enrollRfidValidation, validateRequest, as
         await new Promise((resolve, reject) => {
             mqttClient.publish(topic, command, { qos: 1 }, (err) => {
                 if (err) {
-                    logger.error(`MQTT publish error for enrollment: ${err.message}`);
+                    logger.error(`MQTT publish error for enrollment, IP: ${req.ip}: ${err.message}`);
                     // Usuń sesję jeśli publikacja się nie powiodła
                     enrollmentSessions.delete(reader);
                     reject(new Error('Failed to send enrollment command to reader'));
@@ -122,7 +124,7 @@ router.post('/rfid/enroll', authToken, enrollRfidValidation, validateRequest, as
             });
         });
         
-        logger.info(`RFID enrollment started for reader: ${reader}`);
+        logger.info(`RFID enrollment started for reader: ${reader}, IP: ${req.ip}`);
         res.json({ 
             success: true,
             message: `RFID enrollment started for reader ${reader}`,
@@ -131,7 +133,7 @@ router.post('/rfid/enroll', authToken, enrollRfidValidation, validateRequest, as
         });
         
     } catch (error) {
-        logger.error(`Error starting RFID enrollment: ${error.message}`);
+        logger.error(`Error starting RFID enrollment, IP: ${req.ip}: ${error.message}`);
         res.status(500).json({
             error: 'Internal server error',
             message: error.message || 'Failed to start RFID enrollment process'
@@ -143,7 +145,7 @@ router.post('/rfid/enroll', authToken, enrollRfidValidation, validateRequest, as
 router.post('/rfid/save', mqttAuth, saveRfidValidation, validateRequest, async (req, res) => {
     const { reader, tagId, sessionId, tagSecret } = req.body;
     
-    logger.info(`Saving RFID card: reader=${reader}, tagId=${tagId}, sessionId=${sessionId}, hasSecret=${!!tagSecret}`);
+    logger.info(`Saving RFID card: reader=${reader}, tagId=${tagId}, sessionId=${sessionId}, hasSecret=${!!tagSecret}, IP: ${req.ip}`);
     
     if (!reader || !tagId) {
         return res.status(400).json({
@@ -158,7 +160,7 @@ router.post('/rfid/save', mqttAuth, saveRfidValidation, validateRequest, async (
         logger.info(`Enrollment session for ${reader}:`, session);
         
         if (!session) {
-            logger.warn(`No enrollment session found for reader: ${reader}`);
+            logger.warn(`No enrollment session found for reader: ${reader}, IP: ${req.ip}`);
             logger.warn(`Available sessions:`, Array.from(enrollmentSessions.keys()));
             return res.status(400).json({
                 error: 'No enrollment session',
@@ -183,11 +185,11 @@ router.post('/rfid/save', mqttAuth, saveRfidValidation, validateRequest, async (
             // Zaktualizuj secret jeśli podano
             if (tagSecret) {
                 await db.query('UPDATE tags SET tag_secret = $1 WHERE tag_id = $2', [tagSecret, tagId]);
-                logger.info(`Updated secret for existing tag: ${tagId}`);
+                logger.info(`Updated secret for existing tag: ${tagId}, IP: ${req.ip}`);
             }
         } else {
             // Tag nie istnieje, dodaj go z employeeId i secret
-            logger.info(`Inserting new tag with employeeId: ${employeeId} and secret`);
+            logger.info(`Inserting new tag with employeeId: ${employeeId} and secret, IP: ${req.ip}`);
             const insertQuery = tagSecret 
                 ? 'INSERT INTO tags (tag_id, employee_id, tag_secret) VALUES ($1, $2, $3)'
                 : 'INSERT INTO tags (tag_id, employee_id) VALUES ($1, $2)';
@@ -204,7 +206,7 @@ router.post('/rfid/save', mqttAuth, saveRfidValidation, validateRequest, async (
         // Usuń sesję enrollment
         enrollmentSessions.delete(reader);
         
-        logger.info(`Card ${tagId} assigned to employee ${employeeId} with secret support`);
+        logger.info(`Card ${tagId} assigned to employee ${employeeId} with secret support, IP: ${req.ip}`);
         res.json({
             success: true,
             message: 'Card enrolled and assigned successfully',
@@ -214,7 +216,7 @@ router.post('/rfid/save', mqttAuth, saveRfidValidation, validateRequest, async (
         });
         
     } catch (error) {
-        logger.error(`Error saving enrolled card: ${error.message || error}`);
+        logger.error(`Error saving enrolled card, IP: ${req.ip}: ${error.message || error}`);
         res.status(500).json({
             error: 'Database error',
             message: error.message || 'Failed to save enrolled card'
@@ -225,7 +227,7 @@ router.post('/rfid/save', mqttAuth, saveRfidValidation, validateRequest, async (
 router.delete('/delete/:tagId', authToken, deleteTagValidation, validateRequest, async (req, res) => {
     const { tagId } = req.params;
 
-    logger.info(`Deleting RFID card: tagId=${tagId} by user: ${req.user.user_id}`);
+    logger.info(`Próba usunięcia tagu RFID: ${tagId}, użytkownik: ${req.user.email} (ID: ${req.user.user_id}), IP: ${req.ip}`);
 
     if (!tagId) {
         return res.status(400).json({
@@ -241,7 +243,7 @@ router.delete('/delete/:tagId', authToken, deleteTagValidation, validateRequest,
         // Usuń przypisanie karty z pracownika
         await db.none('UPDATE employees SET keycard_id = NULL WHERE keycard_id = $1', [tagId]);
         
-        logger.info(`Card ${tagId} deleted successfully`);
+        logger.info(`Card ${tagId} deleted successfully, IP: ${req.ip}`);
         res.json({
             success: true,
             message: 'Card deleted successfully',
@@ -249,7 +251,7 @@ router.delete('/delete/:tagId', authToken, deleteTagValidation, validateRequest,
         });
         
     } catch (error) {
-        logger.error(`Error deleting RFID card: ${error.message || error}`);
+        logger.error(`Error deleting RFID card, IP: ${req.ip}: ${error.message || error}`);
         res.status(500).json({
             error: 'Database error',
             message: error.message || 'Failed to delete RFID card'
@@ -261,14 +263,14 @@ router.get('/check-access/:uid', mqttAuth, checkAccessValidation, validateReques
     const uid = req.params.uid;
     const providedSecret = req.headers.secret // Secret może być w query lub header
     
-    console.log(`Checking access for RFID tag: ${uid}, hasSecret: ${!!providedSecret}`);
-    logger.info(`Checking access for RFID tag: ${uid}, hasSecret: ${!!providedSecret}`);
+    console.log(`Checking access for RFID tag: ${uid}, hasSecret: ${!!providedSecret}, IP: ${req.ip}`);
+    logger.info(`Checking access for RFID tag: ${uid}, hasSecret: ${!!providedSecret}, IP: ${req.ip}`);
 
     try {
         const tag = await db.oneOrNone('SELECT * FROM tags WHERE tag_id = $1', [uid]);
         
         if (!tag) {
-            logger.warn(`No tag found for UID: ${uid}`);
+            logger.warn(`No tag found for UID: ${uid}, IP: ${req.ip}`);
             req.accessStatus = 'DENIED';
             logAccess(req, res, () => {}); // Zaloguj próbę dostępu z nieznanym tagiem
             return res.json({
@@ -281,7 +283,7 @@ router.get('/check-access/:uid', mqttAuth, checkAccessValidation, validateReques
         // Sprawdź secret jeśli tag ma przypisany secret
         if (tag.tag_secret) {
             if (!providedSecret) {
-                logger.warn(`Tag ${uid} requires secret but none provided`);
+                logger.warn(`Tag ${uid} requires secret but none provided, IP: ${req.ip}`);
                 req.accessStatus = 'DENIED';
                 logAccess(req, res, () => {}); // Zaloguj próbę dostępu bez secret
                 return res.json({
@@ -291,7 +293,7 @@ router.get('/check-access/:uid', mqttAuth, checkAccessValidation, validateReques
             }
             
             if (tag.tag_secret !== providedSecret) {
-                logger.warn(`Invalid secret for tag ${uid}`);
+                logger.warn(`Invalid secret for tag ${uid}, IP: ${req.ip}`);
                 req.accessStatus = 'DENIED';
                 logAccess(req, res, () => {}); // Zaloguj próbę dostępu z nieprawidłowym secret
                 return res.json({
@@ -306,7 +308,7 @@ router.get('/check-access/:uid', mqttAuth, checkAccessValidation, validateReques
             const employee = await db.oneOrNone('SELECT * FROM employees WHERE employee_id = $1', [tag.employee_id]);
             
             if (!employee) {
-                logger.warn(`Tag ${uid} assigned to non-existent employee ${tag.employee_id}`);
+                logger.warn(`Tag ${uid} assigned to non-existent employee ${tag.employee_id}, IP: ${req.ip}`);
                 req.accessStatus = 'DENIED';
                 logAccess(req, res, () => {}); // Zaloguj próbę dostępu z tagiem przypisanym do nieistniejącego pracownika
                 return res.json({
@@ -319,7 +321,7 @@ router.get('/check-access/:uid', mqttAuth, checkAccessValidation, validateReques
             // if (!employee.is_active) { ... }
         }
 
-        logger.info(`Access granted for tag ${uid}`);
+        logger.info(`Access granted for tag ${uid}, IP: ${req.ip}`);
 
         req.accessStatus = 'ALLOW';
         logAccess(req, res, () => {}); // Zaloguj dostęp
@@ -333,7 +335,7 @@ router.get('/check-access/:uid', mqttAuth, checkAccessValidation, validateReques
         
 
     } catch (error) {
-        logger.error(`Error checking access for UID ${uid}: ${error.message || error}`);
+        logger.error(`Error checking access for UID ${uid}, IP: ${req.ip}: ${error.message || error}`);
         res.status(500).json({
             error: 'Database error',
             response: 'DENIED',

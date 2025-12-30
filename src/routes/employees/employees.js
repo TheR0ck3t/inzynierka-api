@@ -2,10 +2,12 @@ const express = require('express');
 const router = express.Router();
 const db = require('../../modules/dbModules/db');
 const authToken = require('../../middleware/authToken');
+const logger = require('../../logger');
 const { addEmployeeValidation, updateEmployeeValidation, deleteEmployeeValidation, getEmployeeValidation } = require('../../validators');
 const validateRequest = require('../../middleware/validateRequest');
 
 router.get('/list', authToken, async (req, res) => {
+    logger.info(`Próba pobrania listy pracowników z IP: ${req.ip}`);
     const currentUserId = req.user.user_id;
     // Pobierz employee_id aktualnie zalogowanego użytkownika
     const currentUserEmployee = await db.oneOrNone('SELECT employee_id FROM users WHERE user_id = $1', [currentUserId]);
@@ -41,6 +43,7 @@ router.get('/list', authToken, async (req, res) => {
 });
 
 router.post('/add', authToken, addEmployeeValidation, validateRequest,  async (req, res) => {
+    logger.info(`Próba dodania pracownika, użytkownik: ${req.user.email} (ID: ${req.user.user_id}), IP: ${req.ip}`);
     const { first_name, last_name, dob, employment_date, employment_type_id } = req.body;
     // Używamy tekstu zapytania z bezpośrednimi parametrami
     const query =  'INSERT INTO employees (first_name, last_name, dob, employment_date, employment_type_id) VALUES ($1, $2, $3, $4, $5) RETURNING *'
@@ -63,6 +66,7 @@ router.post('/add', authToken, addEmployeeValidation, validateRequest,  async (r
 });
 
 router.delete('/delete/:id', authToken, deleteEmployeeValidation, validateRequest, async (req, res) => {
+    logger.info(`Próba usunięcia pracownika ${req.params.id} z IP: ${req.ip}`);
     const employeeId = req.params.id;
     
     db.result('DELETE FROM employees WHERE employee_id = $1', [employeeId])
@@ -91,6 +95,7 @@ router.delete('/delete/:id', authToken, deleteEmployeeValidation, validateReques
 });
 
 router.get('/:id', authToken, getEmployeeValidation, validateRequest, async (req, res) => {
+    logger.info(`Próba pobrania pracownika ${req.params.id} z IP: ${req.ip}`);
     const employeeId = req.params.id;
 
     db.one('SELECT * FROM employee_info WHERE employee_id = $1', [employeeId])
