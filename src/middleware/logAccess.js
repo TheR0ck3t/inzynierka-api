@@ -1,12 +1,13 @@
 const db = require('../modules/dbModules/db');
 const logger = require('../logger');
+const { log } = require('winston');
 
 const logAccess = async (req, res, next) => {
     const uid = req.params.uid;
     const reader = req.headers.reader;
     const status = req.accessStatus || 'PENDING';
-    
-    console.log(`logAccess middleware: UID=${uid}, Reader=${reader}, Status=${status}`);
+
+    logger.info(`logAccess middleware: Logging access attempt for UID=${uid}, Reader=${reader}, Status=${status}, IP: ${req.ip}`);
     
     if (!uid) {
         logger.warn(`No UID provided in request from IP: ${req.ip}`);
@@ -14,11 +15,10 @@ const logAccess = async (req, res, next) => {
     }
     
     try {
+        logger.info(`Logging access for UID: ${uid}, Reader:${reader}, Status:${status}, IP: ${req.ip}`);
         // Użyj widoku employee_info aby pobrać wszystkie dane naraz
         const employeeInfo = await db.oneOrNone('SELECT * FROM employee_info WHERE tag_id = $1', [uid]);
-        
-        console.log(`Logging access for UID: ${uid}, Reader:${reader}, Status:${status}`);
-        
+
         // Znajdź reader w tabeli readers
         const readerData = await db.oneOrNone('SELECT * FROM readers WHERE name = $1', [reader]);
         
@@ -58,7 +58,7 @@ const logAccess = async (req, res, next) => {
         if (accessLogsNamespace) {
             accessLogsNamespace.emit('new-log', logData);
         }
-        
+        logger.info(`Access logged successfully: ${accessId}, IP: ${req.ip}`);
     } catch (error) {
         logger.error(`Error logging access: ${error.message}, IP: ${req.ip}`);
     }

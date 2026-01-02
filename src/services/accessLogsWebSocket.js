@@ -3,21 +3,21 @@ const logger = require('../logger');
 let accessLogsNamespace = null;
 
 function setupAccessLogsWebSocket(io) {
-    console.log('Setting up accessLogsWebSocket...');
+    logger.info(`Ustawianie WebSocket dla /access-logs namespace`);
     accessLogsNamespace = io.of('/access-logs');
     accessLogsNamespace.on('connection', (socket) => {
-        logger.info(`Client connected to /access-logs namespace: ${socket.id}`);
+        logger.info(`Klient połączony z namespace /access-logs: ${socket.id}`);
         socket.on('get_logs', (logData) => {
-            console.log(`New access logs request received from ${socket.id}`);
+            logger.info(`Nowy access logs request otrzymany od ${socket.id}`);
             // logger.info(`Received get_logs request from ${socket.id}`);
             // Tutaj możesz dodać obsługę wysyłania historii logów, jeśli chcesz
         });
         socket.on('log-access', (logData) => {
-            console.log(`New access log received from ${socket.id}:`, logData);
+            logger.info(`Nowy access log otrzymany od ${socket.id}: ${JSON.stringify(logData)}`);
             // logger.info(`Received log-access event from ${socket.id}: ${JSON.stringify(logData)}`);
         });
         socket.on('disconnect', () => {
-            logger.info(`Client disconnected from /access-logs namespace: ${socket.id}`);
+            logger.info(`Klient rozłączony z namespace /access-logs: ${socket.id}`);
         });
     });
 }

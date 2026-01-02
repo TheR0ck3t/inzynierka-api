@@ -3,7 +3,7 @@ const router = express.Router();
 const db = require('../../modules/dbModules/db');
 const jwt = require('jsonwebtoken');
 const { comparePasswords } = require('../../modules/authModules/userAuth');
-const { loginValidation } = require('../../validators');
+const { loginValidation } = require('../../validators/validators');
 const validateRequest = require('../../middleware/validateRequest');
 const logger = require('../../logger');
 
@@ -79,7 +79,7 @@ router.post('/', loginValidation, validateRequest, async(req, res) => {
         logger.info(`User ${user.email} logged in successfully from IP: ${req.ip}`);
         return res.status(200).json({ message: 'Logged in successfully', user: responseUser });
     } catch (error) {
-        console.error('Error during login process:', error);
+        logger.error(`Nieudana próba logowania do konta ${email} z IP: ${req.ip} - ${error.message}`);
         return res.status(500).json({ error: 'Nie udało się zalogować' });
     }
 });

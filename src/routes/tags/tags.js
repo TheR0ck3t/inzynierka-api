@@ -7,7 +7,7 @@ const authToken = require('../../middleware/authToken'); // Import middleware au
 const mqttAuth = require('../../middleware/mqttAuth'); // Import MQTT auth middleware
 const logAccess = require('../../middleware/logAccess'); // Import middleware logAccess
 const workTimeTracker = require('../../middleware/workTimeTracker'); // Import middleware workTimeTracker
-const { addTagValidation, deleteTagValidation, enrollRfidValidation, updateSecretValidation, saveRfidValidation, checkAccessValidation } = require('../../validators');
+const { addTagValidation, deleteTagValidation, enrollRfidValidation, updateSecretValidation, saveRfidValidation, checkAccessValidation } = require('../../validators/validators');
 const validateRequest = require('../../middleware/validateRequest');
 // Tymczasowe przechowywanie danych enrollment
 let enrollmentSessions = new Map();
@@ -260,11 +260,9 @@ router.delete('/delete/:tagId', authToken, deleteTagValidation, validateRequest,
 });
 
 router.get('/check-access/:uid', mqttAuth, checkAccessValidation, validateRequest, async (req, res) => {
+    logger.info(`Checking access for RFID tag: ${uid}, hasSecret: ${!!providedSecret}, IP: ${req.ip}`);
     const uid = req.params.uid;
     const providedSecret = req.headers.secret // Secret może być w query lub header
-    
-    console.log(`Checking access for RFID tag: ${uid}, hasSecret: ${!!providedSecret}, IP: ${req.ip}`);
-    logger.info(`Checking access for RFID tag: ${uid}, hasSecret: ${!!providedSecret}, IP: ${req.ip}`);
 
     try {
         const tag = await db.oneOrNone('SELECT * FROM tags WHERE tag_id = $1', [uid]);

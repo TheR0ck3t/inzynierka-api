@@ -4,7 +4,7 @@ const authToken = require('../../middleware/authToken');
 const db = require('../../modules/dbModules/db');
 const logger = require('../../logger');
 const { generateSecret, generateQRCode, verify2FA  } = require('../../modules/2faModules/2fa.js');
-const { enable2FAValidation, disable2FAValidation } = require('../../validators');
+const { enable2FAValidation, disable2FAValidation } = require('../../validators/validators.js');
 const validateRequest = require('../../middleware/validateRequest');
 
 
@@ -20,14 +20,14 @@ router.post('/enable', authToken, enable2FAValidation, validateRequest, async (r
 
         // Zapisz sekret w bazie danych
         await db.query('UPDATE users SET two_factor_secret = $1 WHERE user_id = $2', [secretData.secret, userId]);
-
+        logger.info(`2FA secret saved for user: ${req.user.email} (ID: ${req.user.user_id})`);
         res.status(200).json({
             message: '2FA secret generated successfully',
             qrCodeDataUrl,
             secret: secretData.secret,
         });
     } catch (error) {
-        console.error('Error generating 2FA secret:', error);
+        logger.error(`Błąd generowania sekretu 2FA dla użytkownika: ${req.user.email} (ID: ${req.user.user_id}), IP: ${req.ip} - ${error.message}`);
         res.status(500).json({ message: 'Failed to generate 2FA secret' });
     }
 
@@ -41,7 +41,7 @@ router.post('/disable', authToken, disable2FAValidation, validateRequest, async 
         await db.query('UPDATE users SET two_factor_secret = NULL WHERE user_id = $1', [userId]);
         res.status(200).json({ message: '2FA disabled successfully' });
     } catch (error) {
-        console.error('Error disabling 2FA:', error);
+        logger.error(`Błąd wyłączania 2FA dla użytkownika: ${req.user.email} (ID: ${req.user.user_id}), IP: ${req.ip} - ${error.message}`);
         res.status(500).json({ message: 'Failed to disable 2FA' });
     }
 });

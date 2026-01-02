@@ -17,7 +17,7 @@ router.get('/access-logs', authToken, (req, res) => {
         });
     })
     .catch(error => {
-        console.error("Error fetching access logs:", error);
+        logger.error(`Błąd podczas pobierania logów dostępu, użytkownik: ${req.user.email} (ID: ${req.user.user_id}), IP: ${req.ip} - ${error.message || error}`);
         res.status(500).json({
             status: 'error',
             message: 'Failed to fetch access logs',

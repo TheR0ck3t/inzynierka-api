@@ -3,11 +3,11 @@ const router = express.Router();
 const db = require('../../modules/dbModules/db');
 const authToken = require('../../middleware/authToken');
 const logger = require('../../logger');
-const { addEmployeeValidation, updateEmployeeValidation, deleteEmployeeValidation, getEmployeeValidation } = require('../../validators');
+const { addEmployeeValidation, updateEmployeeValidation, deleteEmployeeValidation, getEmployeeValidation } = require('../../validators/validators');
 const validateRequest = require('../../middleware/validateRequest');
 
 router.get('/list', authToken, async (req, res) => {
-    logger.info(`Próba pobrania listy pracowników z IP: ${req.ip}`);
+    logger.info(`Próba pobrania listy pracowników przez użytkownika: ${req.user.email} (ID: ${req.user.user_id})`);
     const currentUserId = req.user.user_id;
     // Pobierz employee_id aktualnie zalogowanego użytkownika
     const currentUserEmployee = await db.oneOrNone('SELECT employee_id FROM users WHERE user_id = $1', [currentUserId]);
@@ -33,7 +33,7 @@ router.get('/list', authToken, async (req, res) => {
             });
         })
         .catch(error => {
-            console.error("Error fetching data:", error);
+            logger.error(`Błąd podczas pobierania pracowników, użytkownik: ${req.user.email} (ID: ${req.user.user_id}) - ${error.message || error}`);
             res.status(500).json({
                 status: 'error',
                 message: 'Failed to fetch employees',
@@ -56,7 +56,7 @@ router.post('/add', authToken, addEmployeeValidation, validateRequest,  async (r
             data: data
         });
     } catch (error) {
-        console.error("Error inserting data:", error);
+        logger.error(`Błąd dodawania pracownika ${error.message || error}`);
         res.status(500).json({
             status: 'error',
             message: 'Failed to add employee.',
@@ -85,7 +85,7 @@ router.delete('/delete/:id', authToken, deleteEmployeeValidation, validateReques
             }
         })
         .catch(error => {
-            console.error("Error deleting Employee:", error);
+            logger.error(`Błąd usuwania pracownika, użytkownik: ${req.user.email} (ID: ${req.user.user_id}) - ${error.message || error}`);
             res.status(500).json({
                 status: 'error',
                 message: 'Failed to delete Employee',
@@ -107,7 +107,7 @@ router.get('/:id', authToken, getEmployeeValidation, validateRequest, async (req
             });
         })
         .catch(error => {
-            console.error("Error fetching employee:", error);
+            logger.error(`Błąd pobierania pracownika, użytkownik: ${req.user.email} (ID: ${req.user.user_id}), IP: ${req.ip} - ${error.message || error}`);
             res.status(500).json({
                 status: 'error',
                 message: 'Failed to fetch employee',
@@ -117,6 +117,7 @@ router.get('/:id', authToken, getEmployeeValidation, validateRequest, async (req
 });
 
 router.put('/update/:id', authToken, updateEmployeeValidation, validateRequest, async (req, res) => {
+    logger.info(`Próba aktualizacji pracownika ${req.params.id} przez użytkownika: ${req.user.email} (ID: ${req.user.user_id}), IP: ${req.ip}`);
     const employeeId = req.params.id;
     const updates = req.body;
 
@@ -135,7 +136,7 @@ router.put('/update/:id', authToken, updateEmployeeValidation, validateRequest, 
                 data: updatedEmployee
             });
             } catch (error) {
-                console.error("Error updating employee:", error);
+                logger.error(`Błąd zwracania odpowiedzi po aktualizacji pracownika, użytkownik: ${req.user.email} (ID: ${req.user.user_id}) - ${error.message || error}`);
             }
         }
 
@@ -147,7 +148,7 @@ router.put('/update/:id', authToken, updateEmployeeValidation, validateRequest, 
             });
         }
     } catch (error) {
-        console.error("Error updating employee:", error);
+        logger.error(`Błąd aktualizacji pracownika, użytkownik: ${req.user.email} (ID: ${req.user.user_id}) - ${error.message || error}`);
         res.status(500).json({
             status: 'error',
             message: 'Failed to update employee',

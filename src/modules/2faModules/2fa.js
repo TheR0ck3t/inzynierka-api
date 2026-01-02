@@ -12,7 +12,7 @@ async function generateSecret(userEmail) {
             digits: 6,
             period: 30,
         });
-        
+        logger.info(`Generated 2FA secret for user: ${userEmail}`);
         return {
             secret: totp.secret.base32, // Zwraca secret w formacie base32
             otpauthUrl: totp.toString(), // Zwraca URL do otpauth
@@ -43,6 +43,7 @@ async function generateQRCode(otpauthUrl) {
 }
 
 async function verify2FA(secret, token) {
+    logger.info(`Verifying 2FA token`);
     try {
         const totp = new TOTP({
             secret: Secret.fromBase32(secret), // Jak w GitHub

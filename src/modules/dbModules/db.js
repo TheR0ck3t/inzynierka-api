@@ -1,4 +1,5 @@
 const pgp = require('pg-promise')();
+const logger = require('../../logger');
 
 const dbConfig = {
     host: process.env.DB_HOST,
@@ -13,11 +14,11 @@ const db = pgp(dbConfig);
 // Funkcja sprawdzająca połączenie z bazą danych
 async function checkConnection() {
     try {
+        logger.info('Sprawdzanie połączenia z bazą danych');
         const connection = await db.connect();
         connection.done(); // Zwalnianie połączenia
-        console.log(`Connected to the database: ${dbConfig.database} on ${dbConfig.host}:${dbConfig.port}`);
     } catch (error) {
-        console.error('Database connection failed:', error.message || error);
+        logger.error(`Błąd połączenia z bazą danych: ${error.message || error}`);
         process.exit(1); // Zakończenie procesu w przypadku błędu połączenia
     }
 }

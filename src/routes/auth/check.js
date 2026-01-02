@@ -11,7 +11,7 @@ router.get('/', async (req, res) => {
     const token = req.cookies.token;
     
     if (!token) {
-      console.log('No token provided');
+      logger.info(`Brak tokena w żądaniu z IP: ${req.ip}`);
       return res.status(200).json({ isAuthenticated: false });
     }
     
@@ -36,7 +36,7 @@ router.get('/', async (req, res) => {
       }
     });
   } catch (error) {
-    logger.error(`Token verification error, IP: ${req.ip}: ${error.message}`);
+    logger.error(`Błąd weryfikacji tokena, IP: ${req.ip}: ${error.message}`);
     
     // Niezależnie od rodzaju błędu, zwracamy status "nie zalogowany"
     return res.status(200).json({ isAuthenticated: false });

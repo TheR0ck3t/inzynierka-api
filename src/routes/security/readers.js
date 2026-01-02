@@ -18,7 +18,7 @@ router.get('/', authToken, async (req, res) => {
         });
         logger.info(`Successfully fetched readers data for user ID: ${req.user.user_id}, from the IP: ${req.ip}`);
     } catch (error) {
-        console.error(`Error fetching readers: ${error.message || error}`);
+
         res.status(500).json({
             status: 'error',
             message: 'Failed to fetch readers',
@@ -51,7 +51,7 @@ router.post('/add', authToken, addReaderValidation, validateRequest, (req, res) 
         });
     })
     .catch(error => {
-        console.error("Error adding reader:", error);
+        logger.error(`Błąd dodawania czytnika, użytkownik: ${req.user.email} (ID: ${req.user.user_id}), IP: ${req.ip} - ${error.message || error}`);
         res.status(500).json({
             status: 'error',
             message: 'Failed to add reader',
@@ -60,7 +60,7 @@ router.post('/add', authToken, addReaderValidation, validateRequest, (req, res) 
     });
     logger.info(`Reader ${name} added by user ID: ${req.user.user_id}, from the IP: ${req.ip}`);
     } catch (error) {
-        console.error(`Error in /add reader route: ${error.message || error}`);
+        logger.error(`Błąd w trasie /add czytnika, użytkownik: ${req.user.email} (ID: ${req.user.user_id}), IP: ${req.ip} - ${error.message || error}`);
         res.status(500).json({
             status: 'error',
             message: 'Failed to add reader',
@@ -85,7 +85,7 @@ router.put('/update/:id', authToken, updateReaderValidation, validateRequest, as
             const updatedReader = await db.one(query, values);
             return res.json({
                 status: 'success',
-                message: 'Reader updated successfully',
+                message: `Czytnik ${req.params.id} zaktualizowany pomyślnie`,
                 data: updatedReader
             });
         } else {
@@ -95,7 +95,7 @@ router.put('/update/:id', authToken, updateReaderValidation, validateRequest, as
             });
         }
     } catch (error) {
-        console.error(`Error updating reader: ${error.message || error}`);
+        logger.error(`Błąd aktualizacji czytnika, użytkownik: ${req.user.email} (ID: ${req.user.user_id}), IP: ${req.ip} - ${error.message || error}`);
         res.status(500).json({
             status: 'error',
             message: 'Failed to update reader',
@@ -119,15 +119,14 @@ router.delete('/delete/:id', authToken, async (req, res) => {
             status: 'success',
             message: 'Reader deleted successfully'
         });
-        logger.info(`Reader ID: ${readerId} deleted by user ID: ${req.user.user_id}, from the IP: ${req.ip}`);
+        logger.info(`Czytnik ID: ${readerId} usunięty przez użytkownika: ${req.user.email} (ID: ${req.user.user_id}), IP: ${req.ip}`);
     } catch (error) {
-        console.error(`Error deleting reader: ${error.message || error}`);
+        logger.error(`Błąd usuwania czytnika, użytkownik: ${req.user.email} (ID: ${req.user.user_id}), IP: ${req.ip} - ${error.message || error}`);
         res.status(500).json({
             status: 'error',
             message: 'Failed to delete reader',
             error: error.message || error
         });
-        logger.error(`Error deleting reader: ${error.message || error}`);
     }
 });
 

@@ -14,7 +14,7 @@ router.get('/list', authToken, async (req, res) => {
             data: data
         });
     } catch (error) {
-        console.error("Error fetching data:", error);
+        logger.error(`Błąd podczas pobierania typów zatrudnienia, użytkownik: ${req.user.email} (ID: ${req.user.user_id}) - ${error.message || error}`);
         res.status(500).json({
             status: 'error',
             message: 'Failed to fetch employment types',

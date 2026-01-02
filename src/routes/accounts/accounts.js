@@ -4,14 +4,10 @@ const db = require('../../modules/dbModules/db'); // Import bazy danych
 const authToken = require('../../middleware/authToken')
 const userAuth = require('../../modules/authModules/userAuth'); // Import modułu autoryzacji użytkownika
 const logger = require('../../logger');
-const { createAccountValidation, updateAccountValidation, deleteAccountValidation } = require('../../validators');
+const { createAccountValidation, updateAccountValidation, deleteAccountValidation } = require('../../validators/validators');
 const validateRequest = require('../../middleware/validateRequest');
 
-// test
 const mailService = require('../../modules/mailingModules/mailService'); // Import modułu mailowego
-//
-
-
 
 router.get('/', authToken, async (req, res) => {
     logger.info(`Próba pobrania listy użytkowników z IP: ${req.ip}`);
@@ -26,7 +22,7 @@ router.get('/', authToken, async (req, res) => {
             });
         })
         .catch(error => {
-            logger.error(`Error fetching users, IP: ${req.ip}: ${error.message || error}`);
+            logger.error(`Błąd podczas pobierania użytkowników, IP: ${req.ip}: ${error.message || error}`);
             res.status(500).json({
                 status: 'error',
                 message: 'Failed to fetch users',
@@ -63,7 +59,7 @@ router.post('/create', authToken, createAccountValidation, validateRequest, asyn
         });
         await mailService.sendWelcomeEmail(email, firstName, lastName, generatedPassword);
     } catch (error) {
-        logger.error(`Error creating account, IP: ${req.ip}: ${error.message || error}`);
+        logger.error(`Błąd tworzenia konta, IP: ${req.ip}: ${error.message || error}`);
         res.status(500).json({
             status: 'error',
             message: 'Failed to create account.',
@@ -92,7 +88,7 @@ router.delete('/delete/:id', authToken, deleteAccountValidation, validateRequest
             }
         })
         .catch(error => {
-            logger.error(`Error deleting user, IP: ${req.ip}: ${error.message || error}`);
+            logger.error(`Błąd usuwania użytkownika, IP: ${req.ip}: ${error.message || error}`);
             res.status(500).json({
                 status: 'error',
                 message: 'Failed to delete user',

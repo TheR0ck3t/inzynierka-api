@@ -2,6 +2,7 @@ const { validationResult } = require('express-validator');
 const logger = require('../logger');
 
 function validateRequest(req, res, next) {
+    logger.info(`validateRequest middleware: Validating request for ${req.method} ${req.path} from IP: ${req.ip}`);
     const errors = validationResult(req);
 
     if (!errors.isEmpty()) {

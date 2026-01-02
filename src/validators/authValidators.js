@@ -5,7 +5,7 @@ const loginValidation = [
     body('email')
         .trim()
         .notEmpty().withMessage('Email jest wymagany!')
-        .isEmail().withMessage('Nieправидłowy format email!')
+        .isEmail().withMessage('Nieprawidłowy format email!')
         .normalizeEmail()
         .custom(noSQLInjection),
     body('password')

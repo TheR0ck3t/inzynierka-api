@@ -5,6 +5,7 @@ const fs = require('fs');
 const http = require('http');
 const https = require('https');
 const app = express();
+const logger = require('./src/logger');
 
 // Opcjonalna konfiguracja SSL - jeśli certyfikaty są dostępne, użyj HTTPS, w przeciwnym razie HTTP
 let server;
@@ -15,14 +16,16 @@ if (process.env.SSL_KEY_PATH && process.env.SSL_CERT_PATH) {
             cert: fs.readFileSync(process.env.SSL_CERT_PATH)
         };
         server = https.createServer(sslOptions, app);
-        console.log('✅ SSL certificates loaded - using HTTPS');
+        console.log('✅  SSL configured - using HTTPS');
+        logger.info('Certyfikaty SSL znalezione - uruchamianie serwera HTTPS');
     } catch (error) {
         console.log('⚠️  SSL certificates not found or invalid - falling back to HTTP');
-        console.log('   Error:', error.message);
+        logger.warn(`Błąd podczas ładowania certyfikatów SSL: ${error.message}. Uruchamianie serwera HTTP zamiast HTTPS.`);
         server = http.createServer(app);
     }
 } else {
     console.log('ℹ️  SSL not configured - using HTTP');
+    logger.info('Certyfikaty SSL nie zostały skonfigurowane - uruchamianie serwera HTTP');
     server = http.createServer(app);
 }
 
