@@ -1,7 +1,7 @@
 // Główny serwis mailingowy - funkcje biznesowe
 const { sendEmail } = require('./mailer');
 const { welcomeTemplate, passwordResetTemplate, accountDeactivatedTemplate } = require('./templates/userTemplates');
-const logger = require('../../../src/logger'); // Twój logger
+const logger = require('../../logger');
 
 class MailService {
   // Wysłanie emaila powitalnego po utworzeniu konta

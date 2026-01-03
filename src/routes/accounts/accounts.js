@@ -1,11 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../../modules/dbModules/db'); // Import bazy danych
-const authToken = require('../../middleware/authToken')
+const authToken = require('../../middleware/authMiddleware/authToken')
 const userAuth = require('../../modules/authModules/userAuth'); // Import modułu autoryzacji użytkownika
 const logger = require('../../logger');
 const { createAccountValidation, updateAccountValidation, deleteAccountValidation } = require('../../validators/validators');
-const validateRequest = require('../../middleware/validateRequest');
+const validateRequest = require('../../middleware/validationMiddleware/validateRequest');
 
 const mailService = require('../../modules/mailingModules/mailService'); // Import modułu mailowego
 

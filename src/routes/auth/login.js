@@ -4,7 +4,7 @@ const db = require('../../modules/dbModules/db');
 const jwt = require('jsonwebtoken');
 const { comparePasswords } = require('../../modules/authModules/userAuth');
 const { loginValidation } = require('../../validators/validators');
-const validateRequest = require('../../middleware/validateRequest');
+const validateRequest = require('../../middleware/validationMiddleware/validateRequest');
 const logger = require('../../logger');
 
 // Endpoint do logowania

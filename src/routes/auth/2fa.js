@@ -1,11 +1,11 @@
 const express = require('express');
 const router = express.Router();
-const authToken = require('../../middleware/authToken');
+const authToken = require('../../middleware/authMiddleware/authToken');
 const db = require('../../modules/dbModules/db');
 const logger = require('../../logger');
-const { generateSecret, generateQRCode, verify2FA  } = require('../../modules/2faModules/2fa.js');
+const { generateSecret, generateQRCode, verify2FA  } = require('../../modules/2faModules/2fa');
 const { enable2FAValidation, disable2FAValidation } = require('../../validators/validators.js');
-const validateRequest = require('../../middleware/validateRequest');
+const validateRequest = require('../../middleware/validationMiddleware/validateRequest');
 
 
 

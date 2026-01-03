@@ -1,4 +1,4 @@
-const logger = require('../logger');
+const logger = require('../../logger');
 
 function setupRfidControllerNamespace(io, connectedClients, handleCardScanned, handleStatusUpdate) {
     const rfidNamespace = io.of('/rfid');

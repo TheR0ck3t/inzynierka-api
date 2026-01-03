@@ -1,5 +1,5 @@
-const db = require('../modules/dbModules/db');
-const logger = require('../logger');
+const db = require('../../modules/dbModules/db');
+const logger = require('../../logger');
 const { type } = require('os');
 
 const workTimeTracker = async (req, res, next) => {
@@ -48,7 +48,7 @@ const workTimeTracker = async (req, res, next) => {
             // Emit WebSocket update jeśli status się zmienił
             if (statusChanged) {
                 try {
-                    const { emitStatusUpdate } = require('../services/employeesStatusWebSocket');
+                    const { emitStatusUpdate } = require('../../services/webSocketService/employeesStatusWebSocket');
                     emitStatusUpdate({
                         employee_id: employeeId,
                         action: reader === 'mainEntrance' ? 'started_work' : 'ended_work',

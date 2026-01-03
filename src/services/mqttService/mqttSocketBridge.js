@@ -1,6 +1,6 @@
 const mqtt = require('mqtt');
 const { Server } = require('socket.io');
-const logger = require('../logger');
+const logger = require('../../logger');
 
 function setupMqttSocketBridge({ mqttUrl, mqttConfig, server, db }) {
     // Use secure MQTT config if provided, otherwise fallback to URL

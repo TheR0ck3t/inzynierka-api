@@ -1,4 +1,4 @@
-const logger = require('../logger');
+const logger = require('../../logger');
 
 module.exports = async (req, res, next) => {
     logger.info(`mqttAuth middleware: Authenticating MQTT request from IP: ${req.ip}`);

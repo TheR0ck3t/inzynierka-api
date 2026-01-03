@@ -1,14 +1,14 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../../modules/dbModules/db'); // Import bazy danych
-const mqttService = require('../../services/mqttService'); // Import MQTT service
+const mqttService = require('../../services/mqttService/mqttService'); // Import MQTT service
 const logger = require('../../logger');
-const authToken = require('../../middleware/authToken'); // Import middleware auth
-const mqttAuth = require('../../middleware/mqttAuth'); // Import MQTT auth middleware
-const logAccess = require('../../middleware/logAccess'); // Import middleware logAccess
-const workTimeTracker = require('../../middleware/workTimeTracker'); // Import middleware workTimeTracker
+const authToken = require('../../middleware/authMiddleware/authToken'); // Import middleware auth
+const mqttAuth = require('../../middleware/authMiddleware/mqttAuth'); // Import MQTT auth middleware
+const logAccess = require('../../middleware/securityMiddleware/logAccess'); // Import middleware logAccess
+const workTimeTracker = require('../../middleware/statsMiddleware/workTimeTracker'); // Import middleware workTimeTracker
 const { addTagValidation, deleteTagValidation, enrollRfidValidation, updateSecretValidation, saveRfidValidation, checkAccessValidation } = require('../../validators/validators');
-const validateRequest = require('../../middleware/validateRequest');
+const validateRequest = require('../../middleware/validationMiddleware/validateRequest');
 // Tymczasowe przechowywanie danych enrollment
 let enrollmentSessions = new Map();
 

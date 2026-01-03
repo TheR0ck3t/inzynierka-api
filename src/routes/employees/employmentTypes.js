@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../../modules/dbModules/db'); // Import bazy danych
-const authToken = require('../../middleware/authToken')
+const authToken = require('../../middleware/authMiddleware/authToken')
 const logger = require('../../logger');
 
 router.get('/list', authToken, async (req, res) => {
@@ -24,7 +24,7 @@ router.get('/list', authToken, async (req, res) => {
 });
 
 module.exports = {
-   path: '/employees/employmentTypes',
+   path: '/employees/employment-types',
     router,
     routeName: 'employmentTypes' 
 }

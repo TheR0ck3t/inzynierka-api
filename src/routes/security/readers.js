@@ -1,8 +1,8 @@
 const express = require('express');
-const authToken = require('../../middleware/authToken');
+const authToken = require('../../middleware/authMiddleware/authToken');
 const db = require('../../modules/dbModules/db');
 const logger = require('../../logger');
-const validateRequest = require('../../middleware/validateRequest');
+const validateRequest = require('../../middleware/validationMiddleware/validateRequest');
 const { addReaderValidation, updateReaderValidation } = require('../../validators/readerValidators');
 const router = express.Router();
 
@@ -134,7 +134,7 @@ router.delete('/delete/:id', authToken, async (req, res) => {
 
 
 module.exports = {
-   path: '/readers',
+   path: '/security/readers',
     router,
-    routeName: '' 
+    routeName: 'readers' 
 }

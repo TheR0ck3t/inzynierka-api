@@ -1,4 +1,4 @@
-const logger = require('../logger');
+const logger = require('../../logger');
 const { setupRfidControllerNamespace, sendToESP, triggerCardScan } = require('./rfidControllerWebsocket');
 const accessLogsWebSocket = require('./accessLogsWebSocket');
 const employeesStatusWebSocket = require('./employeesStatusWebSocket');

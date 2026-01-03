@@ -1,6 +1,5 @@
-const db = require('../modules/dbModules/db');
-const logger = require('../logger');
-const { log } = require('winston');
+const db = require('../../modules/dbModules/db');
+const logger = require('../../logger');
 
 const logAccess = async (req, res, next) => {
     const uid = req.params.uid;
@@ -53,7 +52,7 @@ const logAccess = async (req, res, next) => {
         };
         
         // Emituj event do wszystkich klientów po dodaniu loga
-        const { getNamespace } = require('../services/accessLogsWebSocket');
+        const { getNamespace } = require('../../services/webSocketService/accessLogsWebSocket');
         const accessLogsNamespace = getNamespace();
         if (accessLogsNamespace) {
             accessLogsNamespace.emit('new-log', logData);

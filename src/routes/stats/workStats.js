@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const authToken = require('../../middleware/authToken');
+const authToken = require('../../middleware/authMiddleware/authToken');
 const db = require('../../modules/dbModules/db');
 const logger = require('../../logger');
-const statsScheduler = require('../../services/statsScheduler');
+const statsScheduler = require('../../services/statsService/statsScheduler');
 
 // Statystyki dzienne (ostatnie 7 dni)
 router.get('/daily', authToken, async (req, res) => {
@@ -176,5 +176,5 @@ router.get('/all-employees-status', authToken, async (req, res) => {
 module.exports = {
    path: '/work-stats',
     router,
-    routeName: 'work-stats'
+    routeName: 'workStats'
 }

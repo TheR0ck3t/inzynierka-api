@@ -25,19 +25,17 @@ if (process.env.SSL_KEY_PATH && process.env.SSL_CERT_PATH) {
     }
 } else {
     console.log('ℹ️  SSL not configured - using HTTP');
-    logger.info('Certyfikaty SSL nie zostały skonfigurowane - uruchamianie serwera HTTP');
     server = http.createServer(app);
 }
 
 const PORT = process.env.PORT;
-const logger = require('./src/logger'); // Dodanie loggera
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 
 // Import serwisów
-const mqttService = require('./src/services/mqttService');
-const webSocketService = require('./src/services/websocket');
-const statsScheduler = require('./src/services/statsScheduler');
+const mqttService = require('./src/services/mqttService/mqttService');
+const webSocketService = require('./src/services/webSocketService/websocket');
+const statsScheduler = require('./src/services/statsService/statsScheduler');
 
 // Konfiguracja proxy - ufaj nagłówkom proxy aby poprawnie odczytywać IP klienta
 // W produkcji: ustaw liczbę proxy (hop count) lub konkretne trusted proxy IPs
@@ -61,26 +59,62 @@ app.use(cors(
 // Wczytywanie tras
 const routesPath = path.join(__dirname, './src/routes');
 const loadRoutes = (dirPath) => {
-    fs.readdirSync(dirPath).forEach(file => {
-        const fullPath = path.join(dirPath, file);
-        if (fs.statSync(fullPath).isDirectory()) {
-            loadRoutes(fullPath);
-        } else {
-            const { path: routePath, router, routeName } = require(fullPath);
-            if (router && routePath) {
-                app.use(routePath, router);
-                const relativePath = path.relative(routesPath, fullPath);
-                logger.info(`Loaded route: ${routeName} at ${routePath} from ${relativePath}`);
-                console.log(`Loaded route: ${routeName}\nPath: ${routePath}\nFrom file: ${relativePath}\n`);
-            } else {
-                logger.error(`Error loading route from file: ${fullPath}`);
-                console.log(`Error loading route from file: ${fullPath}`);
+    try {
+        const files = fs.readdirSync(dirPath);
+        
+        files.forEach(file => {
+            const fullPath = path.join(dirPath, file);
+            const stats = fs.statSync(fullPath);
+            
+            // Rekurencyjne przeszukiwanie podkatalogów
+            if (stats.isDirectory()) {
+                loadRoutes(fullPath);
+                return;
             }
-        }
-    });
+            
+            // Pomijaj pliki nie będące modułami JavaScript
+            if (!file.endsWith('.js')) {
+                return;
+            }
+            
+            try {
+                const routeModule = require(fullPath);
+                const { path: routePath, router, routeName } = routeModule;
+                
+                // Walidacja wymaganych pól
+                if (!router || !routePath || !routeName) {
+                    logger.error(`Moduł trasy nie posiada wymaganych eksportów (path/router/routeName): ${fullPath}`);
+                    console.error(`Błąd: Brak wymaganych eksportów w pliku: ${fullPath}`);
+                    return;
+                }
+                
+                // Rejestracja trasy
+                app.use(routePath, router);
+                
+                const relativePath = path.relative(routesPath, fullPath);
+                logger.info(`Wczytano trasę: ${routeName} pod adresem ${routePath} z pliku ${relativePath}`);
+                console.log(`Wczytano trasę: ${routeName}\nŚcieżka: ${routePath}\nZ pliku: ${relativePath}\n`);
+                
+            } catch (error) {
+                logger.error(`Nie udało się załadować trasy z pliku ${fullPath}: ${error.message}`);
+                console.error(`Błąd ładowania trasy z ${fullPath}: ${error.message}`);
+            }
+        });
+        
+    } catch (error) {
+        logger.error(`Błąd odczytu katalogu ${dirPath}: ${error.message}`);
+        console.error(`Błąd odczytu katalogu ${dirPath}: ${error.message}`);
+    }
 };
 
-loadRoutes(routesPath);
+// Załaduj wszystkie trasy
+try {
+    loadRoutes(routesPath);
+    logger.info('Zakończono ładowanie tras');
+} catch (error) {
+    logger.error(`Krytyczny błąd podczas ładowania tras: ${error.message}`);
+    process.exit(1);
+}
 
 // Inicjalizacja serwisów - użyj MqttService singleton
 const { mqttClient, io } = mqttService.initialize(server);

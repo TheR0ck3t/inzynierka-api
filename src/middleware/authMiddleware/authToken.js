@@ -1,6 +1,6 @@
 const jwt = require('jsonwebtoken');
-const db = require('../modules/dbModules/db');
-const logger = require('../logger');
+const db = require('../../modules/dbModules/db');
+const logger = require('../../logger');
 
 module.exports = async (req, res, next) => {
   logger.info(`AuthToken middleware: Verifying token for user ${req.user ? req.user.user_id : 'unknown user'} for request from IP: ${req.ip} to ${req.originalUrl} with method ${req.method} `);

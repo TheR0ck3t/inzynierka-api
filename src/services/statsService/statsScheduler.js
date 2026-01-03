@@ -1,6 +1,6 @@
 const cron = require('node-cron');
-const db = require('../modules/dbModules/db');
-const logger = require('../logger');
+const db = require('../../modules/dbModules/db');
+const logger = require('../../logger');
 
 let jobs = [];
 let isInitialized = false;
@@ -11,17 +11,10 @@ async function refreshStatsViews() {
         const startTime = Date.now();
         const results = await db.any(`SELECT * FROM refresh_work_stats_views()`);
         const totalTime = Date.now() - startTime;
-
-        results.forEach(row => {
-            logger.info(
-                `[CRON] Refreshed ${row.view_name}: ` +
-                `${row.rows_count} rows in ${row.refresh_time}`
-            );
-        });
-
-        logger.info(`[CRON] Total refresh time: ${totalTime}ms`);
+        
+        logger.info(`[CRON] Odświeżono widoki statystyk czas odświeżenia: ${totalTime}ms`);
     } catch (error) {
-        logger.error('[CRON] Error refreshing stats views:', error);
+        logger.error('[CRON] Błąd podczas odświeżania widoków statystyk:', error);
     }
 }
 
@@ -32,13 +25,13 @@ async function closeExpiredSessions() {
         
         if (result.closed_count > 0) {
             logger.warn(
-                `[CRON] Closed ${result.closed_count} expired sessions (>24h)`
+                `[CRON] Zamknięto ${result.closed_count} wygasłych sesji (>24h)`
             );
         } else {
-            logger.info('[CRON] No expired sessions to close');
+            logger.info('[CRON] Brak wygasłych sesji do zamknięcia');
         }
     } catch (error) {
-        logger.error('[CRON] Error closing expired sessions:', error);
+        logger.error('[CRON] Błąd podczas zamykania wygasłych sesji:', error);
     }
 }
 
@@ -49,20 +42,20 @@ async function cleanupOldLogs() {
         
         if (result.deleted_count > 0) {
             logger.info(
-                `[CRON] Deleted ${result.deleted_count} old access logs (>90 days)`
+                `[CRON] Usunięto ${result.deleted_count} starych logów dostępu (>90 dni)`
             );
         } else {
-            logger.info('[CRON] No old logs to cleanup');
+            logger.info('[CRON] Brak starych logów do usunięcia');
         }
     } catch (error) {
-        logger.error('[CRON] Error cleaning up old logs:', error);
+        logger.error('[CRON] Błąd podczas usuwania starych logów:', error);
     }
 }
 
 // Inicjalizacja wszystkich scheduled jobs
 function init() {
     if (isInitialized) {
-        logger.warn('[StatsScheduler] Already initialized');
+        logger.warn('[StatsScheduler] Już zainicjalizowano');
         return;
     }
 
@@ -104,14 +97,14 @@ function init() {
 
 // Zatrzymanie wszystkich jobs (przy graceful shutdown)
 function stop() {
-    logger.info('[StatsScheduler] Stopping all scheduled jobs...');
+    logger.info('[StatsScheduler] Zatrzymywanie wszystkich zaplanowanych zadań...');
     jobs.forEach(job => job.stop());
-    logger.info('[StatsScheduler] All jobs stopped');
+    logger.info('[StatsScheduler] Wszystkie zadania zatrzymane');
 }
 
 // Natychmiastowe odświeżenie (dla testów lub manual trigger)
 async function forceRefresh() {
-    logger.info('[StatsScheduler] Force refresh triggered manually');
+    logger.info('[StatsScheduler] Wymuszone odświeżenie wywołane ręcznie');
     await refreshStatsViews();
 }
 

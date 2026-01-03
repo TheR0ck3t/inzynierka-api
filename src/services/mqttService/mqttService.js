@@ -1,7 +1,7 @@
 
 const { setupMqttSocketBridge } = require('./mqttSocketBridge');
-const db = require('../modules/dbModules/db');
-const logger = require('../logger');
+const db = require('../../modules/dbModules/db');
+const logger = require('../../logger');
 
 let mqttClient = null;
 let io = null;

@@ -1,5 +1,5 @@
 const express = require('express');
-const authToken = require('../../middleware/authToken');
+const authToken = require('../../middleware/authMiddleware/authToken');
 const db = require('../../modules/dbModules/db');
 const logger = require('../../logger');
 const router = express.Router();
@@ -27,7 +27,7 @@ router.get('/access-logs', authToken, (req, res) => {
 });
 
 module.exports = {
-   path: '/logs',
+   path: '/security/logs',
     router,
     routeName: 'tagLogs'
 }
