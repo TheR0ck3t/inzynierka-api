@@ -5,10 +5,9 @@ const { type } = require('os');
 const workTimeTracker = async (req, res, next) => {
     const uid = req.params.uid;
     const reader = req.headers.reader;
-    logger.info(`workTimeTracker middleware: UID=${uid}, Reader=${reader}, IP: ${req.ip}`);
 
     if (!uid || !reader) {
-        logger.warn(`Missing UID or reader in request from IP: ${req.ip}`);
+        logger.warn('Missing UID or reader in workTimeTracker');
         return next();
     }
 
@@ -18,7 +17,7 @@ const workTimeTracker = async (req, res, next) => {
             const employeeId = employee ? employee.employee_id : null;
             
             if (!employeeId) {
-                logger.warn(`No employee found for tag: ${uid}, IP: ${req.ip}`);
+                logger.warn(`No employee found for tag: ${uid}`);
                 return next();
             }
 
@@ -29,19 +28,19 @@ const workTimeTracker = async (req, res, next) => {
                 if (!activeSession) {
                     // Rozpocznij nową sesję tylko na wejściu
                     await db.none('INSERT INTO work_sessions (employee_id, shift_start) VALUES ($1, NOW())', [employeeId]);
-                    logger.info(`Started new work session for UID: ${uid} at entrance, IP: ${req.ip}`);
+                    logger.info(`Started new work session for UID: ${uid} at entrance`);
                     statusChanged = true;
                 } else {
-                    logger.info(`Work session already active for UID: ${uid} - ignoring entrance scan, IP: ${req.ip}`);
+                    logger.info(`Work session already active for UID: ${uid} - ignoring entrance scan`);
                 }
             } else if (reader === 'mainExit') {
                 if (activeSession) {
                     // Zakończ sesję tylko na wyjściu i tylko jeśli istnieje
                     await db.none('UPDATE work_sessions SET shift_end = NOW() WHERE session_id = $1', [activeSession.session_id]);
-                    logger.info(`Ended work session for UID: ${uid} at exit, IP: ${req.ip}`);
+                    logger.info(`Ended work session for UID: ${uid} at exit`);
                     statusChanged = true;
                 } else {
-                    logger.info(`No active work session for UID: ${uid} - ignoring exit scan, IP: ${req.ip}`);
+                    logger.info(`No active work session for UID: ${uid} - ignoring exit scan`);
                 }
             }
 
@@ -55,12 +54,12 @@ const workTimeTracker = async (req, res, next) => {
                         timestamp: new Date().toISOString()
                     });
                 } catch (wsError) {
-                    logger.error(`Error emitting WebSocket update: ${wsError.message}, IP: ${req.ip}`);
+                    logger.error(`Error emitting WebSocket update: ${wsError.message}`);
                 }
             }
 
         } catch (error) {
-            logger.error(`Error tracking work time for UID: ${uid}, Reader: ${reader}, IP: ${req.ip} - ${error.message}`);
+            logger.error(`Error tracking work time for UID: ${uid}, Reader: ${reader}: ${error.message}`);
         }
     }
     next();

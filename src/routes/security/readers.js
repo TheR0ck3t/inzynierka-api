@@ -8,7 +8,6 @@ const router = express.Router();
 
 
 router.get('/', authToken, async (req, res) => {
-    logger.info(`Próba pobrania czytników, użytkownik: ${req.user.email} (ID: ${req.user.user_id}), IP: ${req.ip}`);
     try {
         const readers = await db.any('SELECT * FROM readers');
         res.json({
@@ -16,7 +15,6 @@ router.get('/', authToken, async (req, res) => {
             message: 'Fetched all readers successfully',
             data: readers
         });
-        logger.info(`Successfully fetched readers data for user ID: ${req.user.user_id}, from the IP: ${req.ip}`);
     } catch (error) {
 
         res.status(500).json({
@@ -30,7 +28,6 @@ router.get('/', authToken, async (req, res) => {
 });
 
 router.post('/add', authToken, addReaderValidation, validateRequest, (req, res) => {
-    logger.info(`Próba dodania czytnika, użytkownik: ${req.user.email} (ID: ${req.user.user_id}), IP: ${req.ip}`);
     const { name, location } = req.body;
     try {
         if (!name || !location) {
@@ -51,16 +48,15 @@ router.post('/add', authToken, addReaderValidation, validateRequest, (req, res) 
         });
     })
     .catch(error => {
-        logger.error(`Błąd dodawania czytnika, użytkownik: ${req.user.email} (ID: ${req.user.user_id}), IP: ${req.ip} - ${error.message || error}`);
+        logger.error(`Błąd dodawania czytnika: ${error.message || error}`);
         res.status(500).json({
             status: 'error',
             message: 'Failed to add reader',
             error: error.message || error
         });
     });
-    logger.info(`Reader ${name} added by user ID: ${req.user.user_id}, from the IP: ${req.ip}`);
     } catch (error) {
-        logger.error(`Błąd w trasie /add czytnika, użytkownik: ${req.user.email} (ID: ${req.user.user_id}), IP: ${req.ip} - ${error.message || error}`);
+        logger.error(`Błąd w trasie /add czytnika: ${error.message || error}`);
         res.status(500).json({
             status: 'error',
             message: 'Failed to add reader',
@@ -71,7 +67,6 @@ router.post('/add', authToken, addReaderValidation, validateRequest, (req, res) 
 });
 
 router.put('/update/:id', authToken, updateReaderValidation, validateRequest, async(req, res) => {
-    logger.info(`Próba aktualizacji czytnika ${req.params.id}, użytkownik: ${req.user.email} (ID: ${req.user.user_id}), IP: ${req.ip}`);
     const readerId = req.params.reader_id;
     const updates = req.body;
     try {
@@ -95,7 +90,7 @@ router.put('/update/:id', authToken, updateReaderValidation, validateRequest, as
             });
         }
     } catch (error) {
-        logger.error(`Błąd aktualizacji czytnika, użytkownik: ${req.user.email} (ID: ${req.user.user_id}), IP: ${req.ip} - ${error.message || error}`);
+        logger.error(`Błąd aktualizacji czytnika: ${error.message || error}`);
         res.status(500).json({
             status: 'error',
             message: 'Failed to update reader',
@@ -105,7 +100,6 @@ router.put('/update/:id', authToken, updateReaderValidation, validateRequest, as
 });
 
 router.delete('/delete/:id', authToken, async (req, res) => {
-    logger.info(`Próba usunięcia czytnika ${req.params.id}, użytkownik: ${req.user.email} (ID: ${req.user.user_id}), IP: ${req.ip}`);
     const readerId = req.params.id;
     try {
         const result = await db.result('DELETE FROM readers WHERE reader_id = $1', [readerId]);
@@ -119,9 +113,9 @@ router.delete('/delete/:id', authToken, async (req, res) => {
             status: 'success',
             message: 'Reader deleted successfully'
         });
-        logger.info(`Czytnik ID: ${readerId} usunięty przez użytkownika: ${req.user.email} (ID: ${req.user.user_id}), IP: ${req.ip}`);
+        logger.info(`Czytnik ID: ${readerId} usunięty przez użytkownika: ${req.user.email} (ID: ${req.user.user_id})`);
     } catch (error) {
-        logger.error(`Błąd usuwania czytnika, użytkownik: ${req.user.email} (ID: ${req.user.user_id}), IP: ${req.ip} - ${error.message || error}`);
+        logger.error(`Błąd usuwania czytnika: ${error.message || error}`);
         res.status(500).json({
             status: 'error',
             message: 'Failed to delete reader',

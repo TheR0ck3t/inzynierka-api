@@ -5,16 +5,13 @@ const logAccess = async (req, res, next) => {
     const uid = req.params.uid;
     const reader = req.headers.reader;
     const status = req.accessStatus || 'PENDING';
-
-    logger.info(`logAccess middleware: Logging access attempt for UID=${uid}, Reader=${reader}, Status=${status}, IP: ${req.ip}`);
     
     if (!uid) {
-        logger.warn(`No UID provided in request from IP: ${req.ip}`);
+        logger.warn('No UID provided in access log request');
         return next();
     }
     
     try {
-        logger.info(`Logging access for UID: ${uid}, Reader:${reader}, Status:${status}, IP: ${req.ip}`);
         // Użyj widoku employee_info aby pobrać wszystkie dane naraz
         const employeeInfo = await db.oneOrNone('SELECT * FROM employee_info WHERE tag_id = $1', [uid]);
 
@@ -23,7 +20,7 @@ const logAccess = async (req, res, next) => {
         
         if (!readerData) {
             // Jeśli reader nie istnieje, zwróć błąd
-            logger.error(`Reader not found: ${reader}, IP: ${req.ip}`);
+            logger.error(`Reader not found: ${reader}`);
             throw new Error(`Reader '${reader}' not found in database`);
         }
         
@@ -57,9 +54,9 @@ const logAccess = async (req, res, next) => {
         if (accessLogsNamespace) {
             accessLogsNamespace.emit('new-log', logData);
         }
-        logger.info(`Access logged successfully: ${accessId}, IP: ${req.ip}`);
+        logger.info(`Access logged successfully: ${accessId}`);
     } catch (error) {
-        logger.error(`Error logging access: ${error.message}, IP: ${req.ip}`);
+        logger.error(`Error logging access: ${error.message}`);
     }
 
     next();

@@ -7,7 +7,6 @@ const router = express.Router();
 
 
 router.get('/access-logs', authToken, (req, res) => {
-    logger.info(`Próba pobrania logów dostępu, użytkownik: ${req.user.email} (ID: ${req.user.user_id}), IP: ${req.ip}`);
     db.any('SELECT * FROM access_logs_employee_info')
     .then(data => {
         res.json({
@@ -17,7 +16,7 @@ router.get('/access-logs', authToken, (req, res) => {
         });
     })
     .catch(error => {
-        logger.error(`Błąd podczas pobierania logów dostępu, użytkownik: ${req.user.email} (ID: ${req.user.user_id}), IP: ${req.ip} - ${error.message || error}`);
+        logger.error(`Błąd podczas pobierania logów dostępu: ${error.message || error}`);
         res.status(500).json({
             status: 'error',
             message: 'Failed to fetch access logs',

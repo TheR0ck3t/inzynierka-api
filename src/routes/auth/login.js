@@ -9,7 +9,6 @@ const logger = require('../../logger');
 
 // Endpoint do logowania
 router.post('/', loginValidation, validateRequest, async(req, res) => {
-    logger.info(`Próba logowania z IP: ${req.ip}`);
     const { email, password, token2fa } = req.body;
     try {
         // Sprawdzenie, czy użytkownik istnieje i jest aktywny
@@ -68,7 +67,7 @@ router.post('/', loginValidation, validateRequest, async(req, res) => {
             await db.oneOrNone('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE email = $1', [email]);
         } catch (err) {
             // Błąd podczas aktualizacji ostatniego logowania - loguj cicho
-            logger.warn(`Błąd podczas aktualizacji ostatniego logowania dla użytkownika ${email}, IP: ${req.ip}: ${err.message}`);
+            logger.warn(`Błąd podczas aktualizacji ostatniego logowania dla użytkownika ${email}: ${err.message}`);
         }
         const responseUser = {
             first_name: userDetails?.first_name || user.first_name,
@@ -76,10 +75,10 @@ router.post('/', loginValidation, validateRequest, async(req, res) => {
             department_name: userDetails?.department_name || null,
             email: user.email,
         };
-        logger.info(`User ${user.email} logged in successfully from IP: ${req.ip}`);
+        logger.info(`Użytkownik ${user.email} zalogowany pomyślnie`);
         return res.status(200).json({ message: 'Logged in successfully', user: responseUser });
     } catch (error) {
-        logger.error(`Nieudana próba logowania do konta ${email} z IP: ${req.ip} - ${error.message}`);
+        logger.error(`Nieudana próba logowania do konta ${email}: ${error.message}`);
         return res.status(500).json({ error: 'Nie udało się zalogować' });
     }
 });

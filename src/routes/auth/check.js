@@ -5,13 +5,11 @@ const db = require('../../modules/dbModules/db');
 const logger = require('../../logger');
 
 router.get('/', async (req, res) => {
-  logger.info(`Próba sprawdzenia autentykacji z IP: ${req.ip}`);
   try {
     // Pobierz token z ciasteczka
     const token = req.cookies.token;
     
     if (!token) {
-      logger.info(`Brak tokena w żądaniu z IP: ${req.ip}`);
       return res.status(200).json({ isAuthenticated: false });
     }
     
@@ -36,7 +34,7 @@ router.get('/', async (req, res) => {
       }
     });
   } catch (error) {
-    logger.error(`Błąd weryfikacji tokena, IP: ${req.ip}: ${error.message}`);
+    logger.error(`Błąd weryfikacji tokena: ${error.message}`);
     
     // Niezależnie od rodzaju błędu, zwracamy status "nie zalogowany"
     return res.status(200).json({ isAuthenticated: false });

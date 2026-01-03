@@ -3,13 +3,11 @@ const db = require('../../modules/dbModules/db');
 const logger = require('../../logger');
 
 module.exports = async (req, res, next) => {
-  logger.info(`AuthToken middleware: Verifying token for user ${req.user ? req.user.user_id : 'unknown user'} for request from IP: ${req.ip} to ${req.originalUrl} with method ${req.method} `);
   // Pobierz token z ciasteczka
   const token = req.cookies.token;
 
-  // Sprawdź, czy token istnieje
+  // Sprawdź, czy token istniej
   if (!token) {
-    logger.warn(`No token provided by ${req.user ? req.user.user_id : 'unknown user'} request from IP: ${req.ip}`);
     return res.status(401).json({ 
       error: 'Brak autoryzacji',
       code: 'token_missing'
@@ -37,17 +35,16 @@ module.exports = async (req, res, next) => {
     next();
     
   } catch (error) {
-    logger.error(`AuthToken middleware: Token verification for ${req.user ? req.user.user_id : 'unknown user'} failed for request from IP: ${req.ip} - ${error.message}`);
+    logger.error(`Weryfikacja tokena nie powiodła się: ${error.message}`);
     
     // Różne komunikaty błędów w zależności od rodzaju błędu
     if (error.name === 'TokenExpiredError') {
-      logger.warn(`AuthToken middleware: Token expired for ${req.user ? req.user.user_id : 'unknown user'} request from IP: ${req.ip}`);
+      logger.warn('Token wygasł - timeout sesji');
       return res.status(401).json({ 
         error: 'Sesja wygasła',
         code: 'token_expired'
       });
     }
-    logger.warn(`AuthToken middleware: Invalid token for ${req.user ? req.user.user_id : 'unknown user'} request from IP: ${req.ip}`);
     return res.status(403).json({ 
       error: 'Nieprawidłowy token',
       code: 'invalid_token'

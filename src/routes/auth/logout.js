@@ -4,7 +4,7 @@ const logger = require('../../logger');
 
 
 router.post('/', (req, res) => {
-    logger.info(`Próba wylogowania z IP: ${req.ip}`);
+    logger.info('Użytkownik wylogowany');
     // Usuwanie ciasteczka tokena
     res.clearCookie('token', { path: '/' });
     res.clearCookie('userId', { path: '/' });

@@ -10,7 +10,6 @@ const validateRequest = require('../../middleware/validationMiddleware/validateR
 const mailService = require('../../modules/mailingModules/mailService'); // Import modułu mailowego
 
 router.get('/', authToken, async (req, res) => {
-    logger.info(`Próba pobrania listy użytkowników z IP: ${req.ip}`);
     const userId = req.user.user_id
     const query = 'SELECT * FROM user_data WHERE user_id != $1';
     db.any(query, [userId])
@@ -22,7 +21,7 @@ router.get('/', authToken, async (req, res) => {
             });
         })
         .catch(error => {
-            logger.error(`Błąd podczas pobierania użytkowników, IP: ${req.ip}: ${error.message || error}`);
+            logger.error(`Błąd podczas pobierania użytkowników: ${error.message || error}`);
             res.status(500).json({
                 status: 'error',
                 message: 'Failed to fetch users',
@@ -32,7 +31,6 @@ router.get('/', authToken, async (req, res) => {
 });
 
 router.post('/create', authToken, createAccountValidation, validateRequest, async (req, res) => {
-    logger.info(`Próba utworzenia konta, użytkownik: ${req.user.email} (ID: ${req.user.user_id}), IP: ${req.ip}`);
     const { firstName, lastName, email } = req.body;
     const generatedPassword = generatePassword();
 
@@ -59,7 +57,7 @@ router.post('/create', authToken, createAccountValidation, validateRequest, asyn
         });
         await mailService.sendWelcomeEmail(email, firstName, lastName, generatedPassword);
     } catch (error) {
-        logger.error(`Błąd tworzenia konta, IP: ${req.ip}: ${error.message || error}`);
+        logger.error(`Błąd tworzenia konta: ${error.message || error}`);
         res.status(500).json({
             status: 'error',
             message: 'Failed to create account.',
@@ -69,7 +67,6 @@ router.post('/create', authToken, createAccountValidation, validateRequest, asyn
 });
 
 router.delete('/delete/:id', authToken, deleteAccountValidation, validateRequest, async (req, res) => {
-    logger.info(`Próba usunięcia użytkownika ${req.params.id} z IP: ${req.ip}`);
     const userId = req.params.id;
     
     db.result('DELETE FROM users WHERE user_id = $1', [userId])
@@ -88,7 +85,7 @@ router.delete('/delete/:id', authToken, deleteAccountValidation, validateRequest
             }
         })
         .catch(error => {
-            logger.error(`Błąd usuwania użytkownika, IP: ${req.ip}: ${error.message || error}`);
+            logger.error(`Błąd usuwania użytkownika: ${error.message || error}`);
             res.status(500).json({
                 status: 'error',
                 message: 'Failed to delete user',
@@ -98,7 +95,6 @@ router.delete('/delete/:id', authToken, deleteAccountValidation, validateRequest
 });
 
 router.put('/update/', authToken, updateAccountValidation, validateRequest, async (req, res) => {
-    logger.info(`Próba aktualizacji konta użytkownika z IP: ${req.ip}`);
     const userId = req.user.user_id;
     const updates = req.body;
     
@@ -154,7 +150,7 @@ router.put('/update/', authToken, updateAccountValidation, validateRequest, asyn
         }
         
     } catch (error) {
-        logger.error(`Error updating user, IP: ${req.ip}: ${error.message || error}`);
+        logger.error(`Error updating user: ${error.message || error}`);
         res.status(500).json({
             status: 'error',
             message: 'Failed to update user',

@@ -12,7 +12,7 @@ const validateRequest = require('../../middleware/validationMiddleware/validateR
 
 
 router.post('/enable', authToken, enable2FAValidation, validateRequest, async (req, res) => {
-    logger.info(`Próba włączenia 2FA, użytkownik: ${req.user.email} (ID: ${req.user.user_id}), IP: ${req.ip}`);
+    logger.info(`Włączanie 2FA dla użytkownika: ${req.user.email} (ID: ${req.user.user_id})`);
     const userId = req.user.user_id;
     try {
         const secretData= await generateSecret(req.user.email);
@@ -27,21 +27,21 @@ router.post('/enable', authToken, enable2FAValidation, validateRequest, async (r
             secret: secretData.secret,
         });
     } catch (error) {
-        logger.error(`Błąd generowania sekretu 2FA dla użytkownika: ${req.user.email} (ID: ${req.user.user_id}), IP: ${req.ip} - ${error.message}`);
+        logger.error(`Błąd generowania sekretu 2FA dla użytkownika: ${req.user.email} (ID: ${req.user.user_id}): ${error.message}`);
         res.status(500).json({ message: 'Failed to generate 2FA secret' });
     }
 
 });
 
 router.post('/disable', authToken, disable2FAValidation, validateRequest, async (req, res) => {
-    logger.info(`Próba wyłączenia 2FA, użytkownik: ${req.user.email} (ID: ${req.user.user_id}), IP: ${req.ip}`);
+    logger.info(`Wyłączanie 2FA dla użytkownika: ${req.user.email} (ID: ${req.user.user_id})`);
     const userId = req.user.user_id;
     try {
         // Usuń sekret 2FA z bazy danych
         await db.query('UPDATE users SET two_factor_secret = NULL WHERE user_id = $1', [userId]);
         res.status(200).json({ message: '2FA disabled successfully' });
     } catch (error) {
-        logger.error(`Błąd wyłączania 2FA dla użytkownika: ${req.user.email} (ID: ${req.user.user_id}), IP: ${req.ip} - ${error.message}`);
+        logger.error(`Błąd wyłączania 2FA dla użytkownika: ${req.user.email} (ID: ${req.user.user_id}): ${error.message}`);
         res.status(500).json({ message: 'Failed to disable 2FA' });
     }
 });

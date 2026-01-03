@@ -6,6 +6,7 @@ const http = require('http');
 const https = require('https');
 const app = express();
 const logger = require('./src/logger');
+const httpLogger = require('./src/middleware/loggingMiddleware/httpLogger');
 
 // Opcjonalna konfiguracja SSL - jeśli certyfikaty są dostępne, użyj HTTPS, w przeciwnym razie HTTP
 let server;
@@ -55,6 +56,15 @@ app.use(cors(
         credentials: true // Umożliwienie przesyłania ciasteczek
     }
 )); // Umożliwienie CORS
+
+// Middleware: Logger HTTP - logowanie wszystkich przychodzących żądań
+app.use((req, res, next) => {
+    // Wykluczenia
+    if (req.method === 'OPTIONS' || req.path === '/health') {
+        return next();
+    }
+    return httpLogger(req, res, next);
+});
 
 // Wczytywanie tras
 const routesPath = path.join(__dirname, './src/routes');

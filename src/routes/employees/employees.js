@@ -7,7 +7,6 @@ const { addEmployeeValidation, updateEmployeeValidation, deleteEmployeeValidatio
 const validateRequest = require('../../middleware/validationMiddleware/validateRequest');
 
 router.get('/list', authToken, async (req, res) => {
-    logger.info(`Próba pobrania listy pracowników przez użytkownika: ${req.user.email} (ID: ${req.user.user_id})`);
     const currentUserId = req.user.user_id;
     // Pobierz employee_id aktualnie zalogowanego użytkownika
     const currentUserEmployee = await db.oneOrNone('SELECT employee_id FROM users WHERE user_id = $1', [currentUserId]);
@@ -33,7 +32,7 @@ router.get('/list', authToken, async (req, res) => {
             });
         })
         .catch(error => {
-            logger.error(`Błąd podczas pobierania pracowników, użytkownik: ${req.user.email} (ID: ${req.user.user_id}) - ${error.message || error}`);
+            logger.error(`Błąd podczas pobierania pracowników: ${error.message || error}`);
             res.status(500).json({
                 status: 'error',
                 message: 'Failed to fetch employees',
@@ -43,7 +42,6 @@ router.get('/list', authToken, async (req, res) => {
 });
 
 router.post('/add', authToken, addEmployeeValidation, validateRequest,  async (req, res) => {
-    logger.info(`Próba dodania pracownika, użytkownik: ${req.user.email} (ID: ${req.user.user_id}), IP: ${req.ip}`);
     const { first_name, last_name, dob, employment_date, employment_type_id } = req.body;
     // Używamy tekstu zapytania z bezpośrednimi parametrami
     const query =  'INSERT INTO employees (first_name, last_name, dob, employment_date, employment_type_id) VALUES ($1, $2, $3, $4, $5) RETURNING *'
@@ -66,7 +64,6 @@ router.post('/add', authToken, addEmployeeValidation, validateRequest,  async (r
 });
 
 router.delete('/delete/:id', authToken, deleteEmployeeValidation, validateRequest, async (req, res) => {
-    logger.info(`Próba usunięcia pracownika ${req.params.id} z IP: ${req.ip}`);
     const employeeId = req.params.id;
     
     db.result('DELETE FROM employees WHERE employee_id = $1', [employeeId])
@@ -85,7 +82,7 @@ router.delete('/delete/:id', authToken, deleteEmployeeValidation, validateReques
             }
         })
         .catch(error => {
-            logger.error(`Błąd usuwania pracownika, użytkownik: ${req.user.email} (ID: ${req.user.user_id}) - ${error.message || error}`);
+            logger.error(`Błąd usuwania pracownika: ${error.message || error}`);
             res.status(500).json({
                 status: 'error',
                 message: 'Failed to delete Employee',
@@ -95,7 +92,6 @@ router.delete('/delete/:id', authToken, deleteEmployeeValidation, validateReques
 });
 
 router.get('/:id', authToken, getEmployeeValidation, validateRequest, async (req, res) => {
-    logger.info(`Próba pobrania pracownika ${req.params.id} z IP: ${req.ip}`);
     const employeeId = req.params.id;
 
     db.one('SELECT * FROM employee_info WHERE employee_id = $1', [employeeId])
@@ -107,7 +103,7 @@ router.get('/:id', authToken, getEmployeeValidation, validateRequest, async (req
             });
         })
         .catch(error => {
-            logger.error(`Błąd pobierania pracownika, użytkownik: ${req.user.email} (ID: ${req.user.user_id}), IP: ${req.ip} - ${error.message || error}`);
+            logger.error(`Błąd pobierania pracownika: ${error.message || error}`);
             res.status(500).json({
                 status: 'error',
                 message: 'Failed to fetch employee',
@@ -117,7 +113,6 @@ router.get('/:id', authToken, getEmployeeValidation, validateRequest, async (req
 });
 
 router.put('/update/:id', authToken, updateEmployeeValidation, validateRequest, async (req, res) => {
-    logger.info(`Próba aktualizacji pracownika ${req.params.id} przez użytkownika: ${req.user.email} (ID: ${req.user.user_id}), IP: ${req.ip}`);
     const employeeId = req.params.id;
     const updates = req.body;
 
@@ -136,7 +131,7 @@ router.put('/update/:id', authToken, updateEmployeeValidation, validateRequest, 
                 data: updatedEmployee
             });
             } catch (error) {
-                logger.error(`Błąd zwracania odpowiedzi po aktualizacji pracownika, użytkownik: ${req.user.email} (ID: ${req.user.user_id}) - ${error.message || error}`);
+                logger.error(`Błąd zwracania odpowiedzi po aktualizacji pracownika: ${error.message || error}`);
             }
         }
 
@@ -148,7 +143,7 @@ router.put('/update/:id', authToken, updateEmployeeValidation, validateRequest, 
             });
         }
     } catch (error) {
-        logger.error(`Błąd aktualizacji pracownika, użytkownik: ${req.user.email} (ID: ${req.user.user_id}) - ${error.message || error}`);
+        logger.error(`Błąd aktualizacji pracownika: ${error.message || error}`);
         res.status(500).json({
             status: 'error',
             message: 'Failed to update employee',
