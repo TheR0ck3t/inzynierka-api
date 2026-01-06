@@ -12,9 +12,9 @@ const validateRequest = require('../../middleware/validationMiddleware/validateR
 // Tymczasowe przechowywanie danych enrollment
 let enrollmentSessions = new Map();
 
-router.get('/list', authToken, async (req, res) => {
+router.get('/list', authToken('IT'), async (req, res) => {
     try {
-        const data = await db.query('SELECT * FROM tags');
+        const data = await db.any('SELECT * FROM tags');
         res.json({
             status: 'success',
             message: 'Fetched all tags successfully',
@@ -30,7 +30,7 @@ router.get('/list', authToken, async (req, res) => {
     }
 });
 
-router.post('/add', authToken, addTagValidation, validateRequest, async (req, res) => {
+router.post('/add', authToken('IT'), addTagValidation, validateRequest, async (req, res) => {
     const tag = req.body.tag;
     const tagSecret = req.body.secret;
 
@@ -39,18 +39,26 @@ router.post('/add', authToken, addTagValidation, validateRequest, async (req, re
     }
 
     try {
-        const existingTag = await db.oneOrNone('SELECT * FROM tags WHERE "tag_id" = $1', [tag]);
-        
-        if (!existingTag) {
+        await db.transaction(async (t) => {
+            const existingTag = await t.oneOrNone('SELECT * FROM tags WHERE "tag_id" = $1', [tag]);
+            
+            if (existingTag) {
+                throw new Error('Tag already exists');
+            }
+            
             // Tag nie istnieje, wstaw go
-            await db.query('INSERT INTO tags ("tag_id", "tag_secret") VALUES ($1, $2)', [tag, tagSecret]);
-            res.status(201).json({ message: 'Tag added successfully' });
-        } else {
-            // Tag już istnieje
-            res.status(400).json({ message: 'Tag already exists' });
-        }
+            await t.none('INSERT INTO tags ("tag_id", "tag_secret") VALUES ($1, $2)', [tag, tagSecret]);
+            logger.info(`Tag ${tag} został dodany`);
+        });
+        
+        res.status(201).json({ message: 'Tag added successfully' });
     } catch (error) {
         logger.error(`Error adding tag: ${error.message || error}`);
+        
+        if (error.message === 'Tag already exists') {
+            return res.status(400).json({ message: error.message });
+        }
+        
         res.status(500).json({
             status: 'error',
             message: 'Failed to add tag.',
@@ -62,7 +70,7 @@ router.post('/add', authToken, addTagValidation, validateRequest, async (req, re
 
 
 // Endpoint POST /rfid/enroll - główny endpoint do rozpoczęcia enrollment
-router.post('/rfid/enroll', authToken, enrollRfidValidation, validateRequest, async (req, res) => {
+router.post('/rfid/enroll', authToken('IT'), enrollRfidValidation, validateRequest, async (req, res) => {
     const { reader = 'mainEntrance', employeeId } = req.body;
 
     if (!employeeId) {
@@ -221,7 +229,7 @@ router.post('/rfid/save', mqttAuth, saveRfidValidation, validateRequest, async (
     }
 });
 
-router.delete('/delete/:tagId', authToken, deleteTagValidation, validateRequest, async (req, res) => {
+router.delete('/delete/:tagId', authToken('IT'), deleteTagValidation, validateRequest, async (req, res) => {
     const { tagId } = req.params;
 
     if (!tagId) {

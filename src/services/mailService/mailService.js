@@ -1,13 +1,12 @@
 // Główny serwis mailingowy - funkcje biznesowe
-const { sendEmail } = require('./mailer');
-const { welcomeTemplate, passwordResetTemplate, accountDeactivatedTemplate } = require('./templates/userTemplates');
+const { sendEmail } = require('../../modules/mailingModules/mailer');
+const { welcomeTemplate, passwordResetTemplate, accountDeactivatedTemplate } = require('../../modules/mailingModules/templates/userTemplates');
 const logger = require('../../logger');
 
-class MailService {
   // Wysłanie emaila powitalnego po utworzeniu konta
-  static async sendWelcomeEmail(email, firstName, lastName, tempPassword) {
+  async function sendWelcomeEmail(email, firstName, lastName, tempPassword, verification_token) {
     try {
-      const template = welcomeTemplate(firstName, lastName, tempPassword);
+      const template = welcomeTemplate(firstName, lastName, tempPassword, verification_token);
       
       const result = await sendEmail(email, template.subject, template.html);
       
@@ -28,7 +27,7 @@ class MailService {
   }
 
   // Wysłanie emaila z resetem hasła
-  static async sendPasswordResetEmail(email, firstName, lastName, resetToken) {
+  async function sendPasswordResetEmail(email, firstName, lastName, resetToken) {
     try {
       const template = passwordResetTemplate(firstName, lastName, resetToken);
       
@@ -50,7 +49,7 @@ class MailService {
   }
 
   // Powiadomienie o dezaktywacji konta
-  static async sendAccountDeactivatedEmail(email, firstName, lastName, reason = null) {
+  async function sendAccountDeactivatedEmail(email, firstName, lastName, reason = null) {
     try {
       const template = accountDeactivatedTemplate(firstName, lastName, reason);
       
@@ -72,7 +71,7 @@ class MailService {
   }
 
   // Ogólna funkcja do wysyłania powiadomień
-  static async sendNotification(email, subject, message, type = 'info') {
+  async function sendNotification(email, subject, message, type = 'info') {
     try {
       const colors = {
         info: '#17a2b8',
@@ -117,9 +116,9 @@ class MailService {
   }
 
   // Test wysyłania emaila
-  static async sendTestEmail(email) {
+  async function sendTestEmail(email) {
     try {
-      return await this.sendNotification(
+      return await sendNotification(
         email,
         'Test email - System GAR',
         'To jest testowa wiadomość email. Jeśli ją otrzymałeś, konfiguracja email działa poprawnie!',
@@ -129,6 +128,11 @@ class MailService {
       throw error;
     }
   }
-}
 
-module.exports = MailService;
+module.exports = {
+  sendWelcomeEmail,
+  sendPasswordResetEmail,
+  sendAccountDeactivatedEmail,
+  sendNotification,
+  sendTestEmail
+};

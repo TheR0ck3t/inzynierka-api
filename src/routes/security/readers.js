@@ -7,7 +7,7 @@ const { addReaderValidation, updateReaderValidation } = require('../../validator
 const router = express.Router();
 
 
-router.get('/', authToken, async (req, res) => {
+router.get('/', authToken('IT'), async (req, res) => {
     try {
         const readers = await db.any('SELECT * FROM readers');
         res.json({
@@ -27,46 +27,39 @@ router.get('/', authToken, async (req, res) => {
 
 });
 
-router.post('/add', authToken, addReaderValidation, validateRequest, (req, res) => {
+router.post('/add', authToken('IT'), addReaderValidation, validateRequest, async (req, res) => {
     const { name, location } = req.body;
+    
     try {
         if (!name || !location) {
-        return res.status(400).json({
-            status: 'error',
-            message: 'Name and location are required'
-        });
-    }
-    db.one(
-        'INSERT INTO readers (name, location) VALUES ($1, $2) RETURNING reader_id',
-        [name, location]
-    )
-    .then(result => {
+            return res.status(400).json({
+                status: 'error',
+                message: 'Name and location are required'
+            });
+        }
+        
+        const result = await db.one(
+            'INSERT INTO readers (name, location) VALUES ($1, $2) RETURNING reader_id',
+            [name, location]
+        );
+        
+        logger.info(`Dodano czytnik: ${name} w lokalizacji ${location}`);
         res.json({
             status: 'success',
             message: 'Reader added successfully',
             reader_id: result.reader_id
         });
-    })
-    .catch(error => {
+    } catch (error) {
         logger.error(`Błąd dodawania czytnika: ${error.message || error}`);
         res.status(500).json({
             status: 'error',
             message: 'Failed to add reader',
             error: error.message || error
         });
-    });
-    } catch (error) {
-        logger.error(`Błąd w trasie /add czytnika: ${error.message || error}`);
-        res.status(500).json({
-            status: 'error',
-            message: 'Failed to add reader',
-            error: error.message || error
-        });
-        logger.error(`Error in /add reader route: ${error.message || error}`);
     }
 });
 
-router.put('/update/:id', authToken, updateReaderValidation, validateRequest, async(req, res) => {
+router.put('/update/:id', authToken('IT'), updateReaderValidation, validateRequest, async(req, res) => {
     const readerId = req.params.reader_id;
     const updates = req.body;
     try {
@@ -99,7 +92,7 @@ router.put('/update/:id', authToken, updateReaderValidation, validateRequest, as
     }
 });
 
-router.delete('/delete/:id', authToken, async (req, res) => {
+router.delete('/delete/:id', authToken('IT'), async (req, res) => {
     const readerId = req.params.id;
     try {
         const result = await db.result('DELETE FROM readers WHERE reader_id = $1', [readerId]);
@@ -129,6 +122,6 @@ router.delete('/delete/:id', authToken, async (req, res) => {
 
 module.exports = {
    path: '/security/readers',
-    router,
-    routeName: 'readers' 
+   router,
+   routeName: 'readers' 
 }

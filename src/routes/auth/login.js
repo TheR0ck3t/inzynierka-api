@@ -51,9 +51,11 @@ router.post('/', loginValidation, validateRequest, async(req, res) => {
 
         // Jeśli 2FA nie jest wymagane, wygeneruj token JWT i kontynuuj
         const token = jwt.sign({ userId: user.user_id, email: user.email, department_name: userDetails?.department_name || null }, process.env.JWT_SECRET, { 
-            expiresIn: process.env.JWT_EXPIRES_IN || '1h' 
+            expiresIn: process.env.JWT_EXPIRES_IN || '1h',
         });
 
+        const isFirstLogin = user.last_login === null;
+        
         // Ustawienie ciasteczek dla tokena 
         res.cookie('token', token, {
             httpOnly: true,
@@ -62,21 +64,31 @@ router.post('/', loginValidation, validateRequest, async(req, res) => {
             maxAge: process.env.SESSION_TIMEOUT // 1 godzina
         });
 
-        // Aktualizacja ostatniego logowania
-        try {
-            await db.oneOrNone('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE email = $1', [email]);
-        } catch (err) {
-            // Błąd podczas aktualizacji ostatniego logowania - loguj cicho
-            logger.warn(`Błąd podczas aktualizacji ostatniego logowania dla użytkownika ${email}: ${err.message}`);
+        // Aktualizacja ostatniego logowania tylko jeśli NIE jest to pierwsze logowanie
+        // (zaktualizujemy po zmianie hasła)
+        if (!isFirstLogin) {
+            try {
+                await db.oneOrNone('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE email = $1', [email]);
+            } catch (err) {
+                // Błąd podczas aktualizacji ostatniego logowania - loguj cicho
+                logger.warn(`Błąd podczas aktualizacji ostatniego logowania dla użytkownika ${email}: ${err.message}`);
+            }
         }
+        
         const responseUser = {
             first_name: userDetails?.first_name || user.first_name,
             last_name: userDetails?.last_name || user.last_name,
             department_name: userDetails?.department_name || null,
             email: user.email,
         };
-        logger.info(`Użytkownik ${user.email} zalogowany pomyślnie`);
-        return res.status(200).json({ message: 'Logged in successfully', user: responseUser });
+        
+        logger.info(`Użytkownik ${user.email} zalogowany pomyślnie${isFirstLogin ? ' (pierwsze logowanie)' : ''}`);
+        
+        return res.status(200).json({ 
+            message: 'Logged in successfully', 
+            user: responseUser,
+            requiresPasswordChange: isFirstLogin
+        });
     } catch (error) {
         logger.error(`Nieudana próba logowania do konta ${email}: ${error.message}`);
         return res.status(500).json({ error: 'Nie udało się zalogować' });

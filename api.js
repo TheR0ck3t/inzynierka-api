@@ -7,6 +7,8 @@ const https = require('https');
 const app = express();
 const logger = require('./src/logger');
 const httpLogger = require('./src/middleware/loggingMiddleware/httpLogger');
+const mailer = require('./src/modules/mailingModules/mailer');
+const db = require('./src/modules/dbModules/db');
 
 // Opcjonalna konfiguracja SSL - jeśli certyfikaty są dostępne, użyj HTTPS, w przeciwnym razie HTTP
 let server;
@@ -126,6 +128,9 @@ try {
     process.exit(1);
 }
 
+// Testowanie połączenia z serwerem email przy starcie
+mailer.testConnection();
+
 // Inicjalizacja serwisów - użyj MqttService singleton
 const { mqttClient, io } = mqttService.initialize(server);
 
@@ -142,20 +147,32 @@ server.listen(PORT, () => {
 });
 
 // Graceful shutdown
-process.on('SIGINT', () => {
-    logger.info('SIGINT received: closing server');
-    statsScheduler.stop();
-    server.close(() => {
-        logger.info('HTTP server closed');
+async function gracefulShutdown(signal) {
+    logger.info(`${signal} received: shutting down gracefully`);
+    
+    try {
+        // 1. Stop scheduler
+        statsScheduler.stop();
+        logger.info('Stopped scheduled jobs');
+        
+        // 2. Close HTTP server (stop accepting new connections)
+        await new Promise((resolve) => {
+            server.close(() => {
+                logger.info('HTTP server closed');
+                resolve();
+            });
+        });
+        
+        // 3. Close database connections
+        await db.gracefulShutdown();
+        
+        logger.info('Graceful shutdown completed');
         process.exit(0);
-    });
-});
+    } catch (error) {
+        logger.error(`Error during shutdown: ${error.message}`);
+        process.exit(1);
+    }
+}
 
-process.on('SIGTERM', () => {
-    logger.info('SIGTERM received: closing server');
-    statsScheduler.stop();
-    server.close(() => {
-        logger.info('HTTP server closed');
-        process.exit(0);
-    });
-});
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));

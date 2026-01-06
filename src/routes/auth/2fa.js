@@ -4,14 +4,28 @@ const authToken = require('../../middleware/authMiddleware/authToken');
 const db = require('../../modules/dbModules/db');
 const logger = require('../../logger');
 const { generateSecret, generateQRCode, verify2FA  } = require('../../modules/2faModules/2fa');
-const { enable2FAValidation, disable2FAValidation } = require('../../validators/validators.js');
 const validateRequest = require('../../middleware/validationMiddleware/validateRequest');
 
 
 
 
 
-router.post('/enable', authToken, enable2FAValidation, validateRequest, async (req, res) => {
+router.get('/status', authToken(), validateRequest, async (req, res) => {
+    logger.info(`Sprawdzanie statusu 2FA dla użytkownika: ${req.user.email} (ID: ${req.user.user_id})`);
+    const userId = req.user.user_id;
+    try {
+        const user = await db.one('SELECT two_factor_secret FROM users WHERE user_id = $1', [userId]);
+        const is2FAEnabled = !!user.two_factor_secret;
+        res.status(200).json({ 
+            status: is2FAEnabled 
+        });
+    } catch (error) {
+        logger.error(`Błąd sprawdzania statusu 2FA dla użytkownika: ${req.user.email} (ID: ${req.user.user_id}): ${error.message}`);
+        res.status(500).json({ message: 'Failed to check 2FA status' });
+    }
+});
+
+router.post('/enable', authToken(), validateRequest, async (req, res) => {
     logger.info(`Włączanie 2FA dla użytkownika: ${req.user.email} (ID: ${req.user.user_id})`);
     const userId = req.user.user_id;
     try {
@@ -33,7 +47,7 @@ router.post('/enable', authToken, enable2FAValidation, validateRequest, async (r
 
 });
 
-router.post('/disable', authToken, disable2FAValidation, validateRequest, async (req, res) => {
+router.post('/disable', authToken(), validateRequest, async (req, res) => {
     logger.info(`Wyłączanie 2FA dla użytkownika: ${req.user.email} (ID: ${req.user.user_id})`);
     const userId = req.user.user_id;
     try {

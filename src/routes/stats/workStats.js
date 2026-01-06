@@ -6,7 +6,7 @@ const logger = require('../../logger');
 const statsScheduler = require('../../services/statsService/statsScheduler');
 
 // Statystyki dzienne (ostatnie 7 dni)
-router.get('/daily', authToken, async (req, res) => {
+router.get('/daily', authToken('HR'), async (req, res) => {
     try {
         const data = await db.any(`
             SELECT 
@@ -39,7 +39,7 @@ router.get('/daily', authToken, async (req, res) => {
 });
 
 // Statystyki tygodniowe
-router.get('/weekly', authToken, async (req, res) => {
+router.get('/weekly', authToken('HR'), async (req, res) => {
     try {
         const data = await db.any(`
             SELECT 
@@ -78,7 +78,7 @@ router.get('/weekly', authToken, async (req, res) => {
 });
 
 // Statystyki miesięczne (po tygodniach)
-router.get('/monthly', authToken, async (req, res) => {
+router.get('/monthly', authToken('HR'), async (req, res) => {
     try {
         const data = await db.any(`
             SELECT 
@@ -107,7 +107,7 @@ router.get('/monthly', authToken, async (req, res) => {
 });
 
 // Aktualnie pracujący
-router.get('/current-employees', authToken, async (req, res) => {
+router.get('/current-employees', authToken('HR'), async (req, res) => {
     try {
         const data = await db.any(`
             SELECT 
@@ -129,7 +129,7 @@ router.get('/current-employees', authToken, async (req, res) => {
 });
 
 // Nieobecni pracownicy (wszyscy którzy nie pracują teraz)
-router.get('/absent-employees', authToken, async (req, res) => {
+router.get('/absent-employees', authToken('HR'), async (req, res) => {
     try {
         // Jeśli widok absent_employees istnieje, użyj go
         // Jeśli nie - zapytanie działa bezpośrednio
@@ -146,7 +146,7 @@ router.get('/absent-employees', authToken, async (req, res) => {
 });
 
 // Wszyscy pracownicy z ich statusem (pracuje/nieobecny)
-router.get('/all-employees-status', authToken, async (req, res) => {
+router.get('/all-employees-status', authToken('HR'), async (req, res) => {
     try {
         const data = await db.any(`
             SELECT * FROM all_employees_status

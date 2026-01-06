@@ -6,42 +6,46 @@ const logger = require('../../logger');
 const { addEmployeeValidation, updateEmployeeValidation, deleteEmployeeValidation, getEmployeeValidation } = require('../../validators/validators');
 const validateRequest = require('../../middleware/validationMiddleware/validateRequest');
 
-router.get('/list', authToken, async (req, res) => {
-    const currentUserId = req.user.user_id;
-    // Pobierz employee_id aktualnie zalogowanego użytkownika
-    const currentUserEmployee = await db.oneOrNone('SELECT employee_id FROM users WHERE user_id = $1', [currentUserId]);
-    
-    let query;
-    let params = [];
-    
-    if (currentUserEmployee && currentUserEmployee.employee_id) {
-        // Jeśli zalogowany user ma powiązanego employee, pomiń go z listy
-        query = 'SELECT employee_id, first_name, last_name, keycard_id FROM employees WHERE employee_id != $1';
-        params = [currentUserEmployee.employee_id];
-    } else {
-        // Jeśli nie ma powiązanego employee, pokaż wszystkich
-        query = 'SELECT employee_id, first_name, last_name, keycard_id FROM employees';
-    }
-    
-    db.any(query, params)
-        .then(data => {
-            res.json({
-                status: 'success',
-                message: 'Fetched all employees successfully',
-                data: data
-            });
-        })
-        .catch(error => {
-            logger.error(`Błąd podczas pobierania pracowników: ${error.message || error}`);
-            res.status(500).json({
-                status: 'error',
-                message: 'Failed to fetch employees',
-                error: error.message || error
-            });
+router.get('/list', authToken('IT','HR'), async (req, res) => {
+    try {
+        const currentUserId = req.user.user_id;
+        // Pobierz employee_id aktualnie zalogowanego użytkownika
+        const currentUserEmployee = await db.oneOrNone('SELECT employee_id FROM users WHERE user_id = $1', [currentUserId]);
+        
+        let query;
+        let params = [];
+        
+        if (currentUserEmployee && currentUserEmployee.employee_id) {
+            // Jeśli zalogowany user ma powiązanego employee, pomiń go z listy
+            if (req.query.departments === 'true') {
+                query = `SELECT employee_id, first_name, last_name, department_name from departmens_employees_all WHERE employee_id != $1`;
+            }
+            else {
+                query = 'SELECT employee_id, first_name, last_name, keycard_id FROM employees WHERE employee_id != $1';
+            }
+            params = [currentUserEmployee.employee_id];
+        } else {
+            // Jeśli nie ma powiązanego employee, pokaż wszystkich
+            query = 'SELECT employee_id, first_name, last_name, keycard_id FROM employees';
+        }
+        
+        const data = await db.any(query, params);
+        res.json({
+            status: 'success',
+            message: 'Fetched all employees successfully',
+            data: data
         });
+    } catch (error) {
+        logger.error(`Błąd podczas pobierania pracowników: ${error.message || error}`);
+        res.status(500).json({
+            status: 'error',
+            message: 'Failed to fetch employees',
+            error: error.message || error
+        });
+    }
 });
 
-router.post('/add', authToken, addEmployeeValidation, validateRequest,  async (req, res) => {
+router.post('/add', authToken('HR'), addEmployeeValidation, validateRequest,  async (req, res) => {
     const { first_name, last_name, dob, employment_date, employment_type_id } = req.body;
     // Używamy tekstu zapytania z bezpośrednimi parametrami
     const query =  'INSERT INTO employees (first_name, last_name, dob, employment_date, employment_type_id) VALUES ($1, $2, $3, $4, $5) RETURNING *'
@@ -63,56 +67,56 @@ router.post('/add', authToken, addEmployeeValidation, validateRequest,  async (r
     }
 });
 
-router.delete('/delete/:id', authToken, deleteEmployeeValidation, validateRequest, async (req, res) => {
+router.delete('/delete/:id', authToken('HR'), deleteEmployeeValidation, validateRequest, async (req, res) => {
     const employeeId = req.params.id;
     
-    db.result('DELETE FROM employees WHERE employee_id = $1', [employeeId])
-        .then(result => {
-            if (result.rowCount > 0) {
-                res.json({
-                    status: 'success',
-                    message: 'Employee deleted successfully',
-                    deletedCount: result.rowCount
-                });
-            } else {
-                res.status(404).json({
-                    status: 'error',
-                    message: 'Employee not found'
-                });
-            }
-        })
-        .catch(error => {
-            logger.error(`Błąd usuwania pracownika: ${error.message || error}`);
-            res.status(500).json({
-                status: 'error',
-                message: 'Failed to delete Employee',
-                error: error.message || error
-            });
-        });
-});
-
-router.get('/:id', authToken, getEmployeeValidation, validateRequest, async (req, res) => {
-    const employeeId = req.params.id;
-
-    db.one('SELECT * FROM employee_info WHERE employee_id = $1', [employeeId])
-        .then(data => {
+    try {
+        const result = await db.result('DELETE FROM employees WHERE employee_id = $1', [employeeId]);
+        
+        if (result.rowCount > 0) {
+            logger.info(`Pracownik ${employeeId} został usunięty`);
             res.json({
                 status: 'success',
-                message: 'Fetched employee successfully',
-                data: data
+                message: 'Employee deleted successfully',
+                deletedCount: result.rowCount
             });
-        })
-        .catch(error => {
-            logger.error(`Błąd pobierania pracownika: ${error.message || error}`);
-            res.status(500).json({
+        } else {
+            res.status(404).json({
                 status: 'error',
-                message: 'Failed to fetch employee',
-                error: error.message || error
+                message: 'Employee not found'
             });
+        }
+    } catch (error) {
+        logger.error(`Błąd usuwania pracownika: ${error.message || error}`);
+        res.status(500).json({
+            status: 'error',
+            message: 'Failed to delete Employee',
+            error: error.message || error
         });
+    }
 });
 
-router.put('/update/:id', authToken, updateEmployeeValidation, validateRequest, async (req, res) => {
+router.get('/:id', authToken('IT','HR'), getEmployeeValidation, validateRequest, async (req, res) => {
+    const employeeId = req.params.id;
+
+    try {
+        const data = await db.one('SELECT * FROM employee_info WHERE employee_id = $1', [employeeId]);
+        res.json({
+            status: 'success',
+            message: 'Fetched employee successfully',
+            data: data
+        });
+    } catch (error) {
+        logger.error(`Błąd pobierania pracownika: ${error.message || error}`);
+        res.status(500).json({
+            status: 'error',
+            message: 'Failed to fetch employee',
+            error: error.message || error
+        });
+    }
+});
+
+router.put('/update/:id', authToken('IT','HR'), updateEmployeeValidation, validateRequest, async (req, res) => {
     const employeeId = req.params.id;
     const updates = req.body;
 

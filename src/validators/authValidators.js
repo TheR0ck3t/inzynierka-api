@@ -11,7 +11,8 @@ const loginValidation = [
     body('password')
         .trim()
         .notEmpty().withMessage('Hasło jest wymagane!')
-        .custom(safeFreeText),
+        .custom(safeFreeText)
+        .custom(noSQLInjection),
     body('token2fa')
         .optional()
         .isLength({ min: 6, max: 6 }).withMessage('Token 2FA musi mieć dokładnie 6 znaków!')
@@ -31,28 +32,21 @@ const changePasswordValidation = [
     body('currentPassword')
         .trim()
         .notEmpty().withMessage('Stare hasło jest wymagane!')
-        .custom(safeFreeText),
+        .custom(safeFreeText)
+        .custom(noSQLInjection),
     body('newPassword')
         .trim()
         .notEmpty().withMessage('Nowe hasło jest wymagane!')
         .isLength({ min: 8 }).withMessage('Nowe hasło musi mieć co najmniej 8 znaków!')
         .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
         .withMessage('Nowe hasło musi zawierać co najmniej jedną wielką literę, jedną małą literę, jedną cyfrę i jeden znak specjalny!')
-        .custom(safeFreeText),
+        .custom(safeFreeText)
+        .custom(noSQLInjection)
 ];
 
-const enable2FAValidation = [
-    // Nie wymaga parametrów body, używa userId z authToken
-];
-
-const disable2FAValidation = [
-    // Nie wymaga parametrów body, używa userId z authToken
-];
 
 module.exports = {
     loginValidation,
     verify2FAValidation,
-    changePasswordValidation,
-    enable2FAValidation,
-    disable2FAValidation
+    changePasswordValidation
 };

@@ -4,7 +4,7 @@ const db = require('../../modules/dbModules/db'); // Import bazy danych
 const authToken = require('../../middleware/authMiddleware/authToken')
 const logger = require('../../logger');
 
-router.get('/list', authToken, async (req, res) => {
+router.get('/list', authToken('HR'), async (req, res) => {
     try {
         const data = await db.any('SELECT employment_type_id, employment_type_name, employment_type_code, employment_description, employment_min_age FROM employment_types');
         res.json({

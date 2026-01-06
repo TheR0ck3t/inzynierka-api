@@ -2,23 +2,19 @@ const { body, param } = require('express-validator');
 const { noSQLInjection, strictNumeric, safeFreeText } = require('./sqlSanitizer');
 
 const createAccountValidation = [
-    body('firstName')
-        .trim()
-        .notEmpty().withMessage('Imię jest wymagane!')
-        .isLength({ min: 2, max: 50 }).withMessage('Imię musi mieć od 2 do 50 znaków!')
-        .matches(/^[A-Za-zÀ-ÖØ-öø-ÿ '-]+$/).withMessage('Imię może zawierać tylko litery, spacje, apostrofy i myślniki!')
-        .custom(noSQLInjection),
-    body('lastName')
-        .trim()
-        .notEmpty().withMessage('Nazwisko jest wymagane!')
-        .isLength({ min: 2, max: 50 }).withMessage('Nazwisko musi mieć od 2 do 50 znaków!')
-        .matches(/^[A-Za-zÀ-ÖØ-öø-ÿ '-]+$/).withMessage('Nazwisko może zawierać tylko litery, spacje, apostrofy i myślniki!')
-        .custom(noSQLInjection),
     body('email')
         .trim()
         .notEmpty().withMessage('Email jest wymagany!')
         .isEmail().withMessage('Nieprawidłowy format adresu email!')
-        .normalizeEmail()        .custom(noSQLInjection)];
+        .normalizeEmail()        
+        .custom(noSQLInjection),
+    body('employee_id')
+        .trim()
+        .notEmpty().withMessage('ID pracownika jest wymagane!')
+        .isInt({ gt: 0 }).withMessage('ID pracownika musi być dodatnią liczbą całkowitą!')
+        .custom(strictNumeric)
+        .custom(noSQLInjection)
+    ];
 
 const updateAccountValidation = [
     body('first_name')
@@ -51,7 +47,8 @@ const updateAccountValidation = [
         .optional()
         .trim()
         .notEmpty().withMessage('Obecne hasło nie może być puste!')
-        .custom(safeFreeText),
+        .custom(safeFreeText)
+        .custom(noSQLInjection),
     body('new_password')
         .optional()
         .trim()
@@ -59,6 +56,7 @@ const updateAccountValidation = [
         .isLength({ min: 8 }).withMessage('Nowe hasło musi mieć minimum 8 znaków!')
         .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/).withMessage('Hasło musi zawierać małą literę, wielką literę, cyfrę i znak specjalny!')
         .custom(safeFreeText)
+        .custom(noSQLInjection)
 ];
 
 const deleteAccountValidation = [
@@ -67,6 +65,7 @@ const deleteAccountValidation = [
         .notEmpty().withMessage('ID użytkownika jest wymagane!')
         .isInt({ gt: 0 }).withMessage('ID użytkownika musi być dodatnią liczbą całkowitą!')
         .custom(strictNumeric)
+        .custom(noSQLInjection)
 ];
 
 module.exports = {

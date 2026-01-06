@@ -7,7 +7,7 @@ const workTimeTracker = async (req, res, next) => {
     const reader = req.headers.reader;
 
     if (!uid || !reader) {
-        logger.warn('Missing UID or reader in workTimeTracker');
+        logger.warn('Brakujący UID lub reader w workTimeTracker');
         return next();
     }
 
@@ -17,7 +17,7 @@ const workTimeTracker = async (req, res, next) => {
             const employeeId = employee ? employee.employee_id : null;
             
             if (!employeeId) {
-                logger.warn(`No employee found for tag: ${uid}`);
+                logger.warn(`Żaden pracownik nie posiada karty o tagu: ${uid}`);
                 return next();
             }
 
@@ -28,19 +28,19 @@ const workTimeTracker = async (req, res, next) => {
                 if (!activeSession) {
                     // Rozpocznij nową sesję tylko na wejściu
                     await db.none('INSERT INTO work_sessions (employee_id, shift_start) VALUES ($1, NOW())', [employeeId]);
-                    logger.info(`Started new work session for UID: ${uid} at entrance`);
+                    logger.info(`Rozpoczęto nową sesję pracy dla UID: ${uid} przy wejściu`);
                     statusChanged = true;
                 } else {
-                    logger.info(`Work session already active for UID: ${uid} - ignoring entrance scan`);
+                    logger.info(`Sesja pracy już aktywna dla UID: ${uid} - pomijanie skanu wejścia`);
                 }
             } else if (reader === 'mainExit') {
                 if (activeSession) {
                     // Zakończ sesję tylko na wyjściu i tylko jeśli istnieje
                     await db.none('UPDATE work_sessions SET shift_end = NOW() WHERE session_id = $1', [activeSession.session_id]);
-                    logger.info(`Ended work session for UID: ${uid} at exit`);
+                    logger.info(`Zakończono sesję pracy dla UID: ${uid} przy wyjściu`);
                     statusChanged = true;
                 } else {
-                    logger.info(`No active work session for UID: ${uid} - ignoring exit scan`);
+                    logger.info(`Brak aktywnej sesji pracy dla UID: ${uid} - pomijanie skanu wyjścia`);
                 }
             }
 
@@ -54,12 +54,12 @@ const workTimeTracker = async (req, res, next) => {
                         timestamp: new Date().toISOString()
                     });
                 } catch (wsError) {
-                    logger.error(`Error emitting WebSocket update: ${wsError.message}`);
+                    logger.error(`Błąd podczas wysyłania aktualizacji WebSocket: ${wsError.message}`);
                 }
             }
 
         } catch (error) {
-            logger.error(`Error tracking work time for UID: ${uid}, Reader: ${reader}: ${error.message}`);
+            logger.error(`Błąd śledzenia czasu pracy dla UID: ${uid}, Czytnik: ${reader}: ${error.message}`);
         }
     }
     next();

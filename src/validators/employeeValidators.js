@@ -81,7 +81,8 @@ const addEmployeeValidation = [
                 throw new Error('Wybrana forma zatrudnienia nie istnieje lub jest nieaktywna');
             }
             return true;
-        }),
+        })
+        .custom(noSQLInjection)
 ];
 
 const updateEmployeeValidation = [
@@ -89,7 +90,8 @@ const updateEmployeeValidation = [
         .trim()
         .notEmpty().withMessage('ID pracownika jest wymagane!')
         .isInt({ gt: 0 }).withMessage('ID pracownika musi być dodatnią liczbą całkowitą!')
-        .custom(strictNumeric),
+        .custom(strictNumeric)
+        .custom(noSQLInjection),
     body('first_name')
         .optional()
         .trim()
@@ -119,7 +121,8 @@ const updateEmployeeValidation = [
                 throw new Error('Wybrana forma zatrudnienia nie istnieje lub jest nieaktywna');
             }
             return true;
-        }),
+        })
+        .custom(noSQLInjection),
 ];
 
 const deleteEmployeeValidation = [
@@ -128,6 +131,7 @@ const deleteEmployeeValidation = [
         .notEmpty().withMessage('ID pracownika jest wymagane!')
         .isInt({ gt: 0 }).withMessage('ID pracownika musi być dodatnią liczbą całkowitą!')
         .custom(strictNumeric)
+        .custom(noSQLInjection)
 ];
 
 const getEmployeeValidation = [
@@ -136,6 +140,7 @@ const getEmployeeValidation = [
         .notEmpty().withMessage('ID pracownika jest wymagane!')
         .isInt({ gt: 0 }).withMessage('ID pracownika musi być dodatnią liczbą całkowitą!')
         .custom(strictNumeric)
+        .custom(noSQLInjection)
 ];
 
 module.exports = {
