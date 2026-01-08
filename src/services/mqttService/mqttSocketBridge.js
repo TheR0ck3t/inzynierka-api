@@ -1,6 +1,7 @@
 const mqtt = require('mqtt');
 const { Server } = require('socket.io');
 const logger = require('../../logger');
+const { getNamespace: getReadersListNamespace } = require('../webSocketService/readersListWebSocket');
 
 function setupMqttSocketBridge({ mqttUrl, mqttConfig, server, db }) {
     // Use secure MQTT config if provided, otherwise fallback to URL
@@ -10,7 +11,13 @@ function setupMqttSocketBridge({ mqttUrl, mqttConfig, server, db }) {
         cors: {
             origin: process.env.FRONTEND_URL || '*',
             methods: ['GET', 'POST']
-        }
+        },
+        pingTimeout: 60000,
+        pingInterval: 25000,
+        upgradeTimeout: 30000,
+        maxHttpBufferSize: 1e8,
+        transports: ['websocket', 'polling'],
+        allowUpgrades: true
     });
 
     mqttClient.on('connect', () => {
@@ -54,10 +61,28 @@ function setupMqttSocketBridge({ mqttUrl, mqttConfig, server, db }) {
                 logger.info('Successfully subscribed to topic: rfid/enrolled');
             }
         });
+        
+        // Subskrybuj aktualizacje listy czytników
+        mqttClient.subscribe('readers/list_update', (err) => {
+            if (err) {
+                logger.error(`Failed to subscribe to topic: readers/list_update - ${err.message}`);
+            } else {
+                logger.info('Successfully subscribed to topic: readers/list_update');
+            }
+        });
+        
+        // Subskrybuj zmiany statusu czytników
+        mqttClient.subscribe('readers/status_changed', (err) => {
+            if (err) {
+                logger.error(`Failed to subscribe to topic: readers/status_changed - ${err.message}`);
+            } else {
+                logger.info('Successfully subscribed to topic: readers/status_changed');
+            }
+        });
     });
     mqttClient.on('message', async (topic, messageBuffer) => {
         const message = messageBuffer.toString();
-        logger.debug(`Received MQTT message on topic ${topic}: ${message}`);
+        logger.info(`Received MQTT message on topic ${topic}: ${message.substring(0, 200)}...`);
         
         try {
             const parts = topic.split('/');
@@ -79,6 +104,38 @@ function setupMqttSocketBridge({ mqttUrl, mqttConfig, server, db }) {
                 // Status nie potrzebuje dalszej obsługi z cardScanned
                 return;
             }
+            else if (parts[0] === 'readers' && parts[1] === 'list_update') {
+                // Handle reader registry updates from kontroler
+                const readers_list = JSON.parse(message);
+                
+                logger.info(`Received readers update from kontroler: ${readers_list.readers.length} readers`);
+                
+                // Broadcast do namespace /readers-list
+                const readersListNamespace = getReadersListNamespace();
+                if (readersListNamespace) {
+                    readersListNamespace.emit('readers_list', readers_list);
+                    logger.info(`Emitted readers_list event to /readers-list namespace`);
+                } else {
+                    logger.warn('readers-list namespace not initialized yet');
+                }
+                return;
+            }
+            else if (parts[0] === 'readers' && parts[1] === 'status_changed') {
+                // Handle reader status changes (online/offline)
+                const statusData = JSON.parse(message);
+                
+                logger.info(`Received readers status change: ${statusData.changes.length} changes`);
+                
+                // Broadcast do namespace /readers-list
+                const readersListNamespace = getReadersListNamespace();
+                if (readersListNamespace) {
+                    readersListNamespace.emit('readers_status_changed', statusData);
+                    logger.info(`Emitted readers_status_changed event to /readers-list namespace`);
+                } else {
+                    logger.warn('readers-list namespace not initialized yet');
+                }
+                return;
+            }
             else if (parts[0] === 'rfid' && parts[1] === 'enrolled') {
                 // Handle new card enrolled from ESP32
                 const enrollData = JSON.parse(message);
@@ -88,7 +145,7 @@ function setupMqttSocketBridge({ mqttUrl, mqttConfig, server, db }) {
                 
                 // Wyślij zapytanie do API o zapisanie karty
                 const axios = require('axios');
-                const apiUrl = process.env.API_URL || 'http://localhost:2137';
+                const apiUrl = process.env.API_URL;
                 
                 logger.info(`Calling API: POST ${apiUrl}/tags/rfid/save`);
                 

@@ -3,24 +3,11 @@ const router = express.Router();
 const db = require('../../modules/dbModules/db');
 const authToken = require('../../middleware/authMiddleware/authToken');
 const { comparePasswords, hashPassword } = require('../../modules/authModules/userAuth');
-const { body } = require('express-validator');
+const { changePasswordValidation } = require('../../validators/authValidators');
 const validateRequest = require('../../middleware/validationMiddleware/validateRequest');
 const logger = require('../../logger');
 
-// Walidacja dla zmiany hasła
-const changePasswordValidation = [
-    body('currentPassword')
-        .notEmpty()
-        .withMessage('Obecne hasło jest wymagane'),
-    body('newPassword')
-        .isLength({ min: 8 })
-        .withMessage('Nowe hasło musi mieć co najmniej 8 znaków')
-        .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]/)
-        .withMessage('Hasło musi zawierać: wielką literę, małą literę, cyfrę i znak specjalny'),
-    body('confirmPassword')
-        .custom((value, { req }) => value === req.body.newPassword)
-        .withMessage('Hasła nie są identyczne')
-];
+
 
 // Endpoint do zmiany hasła
 router.post('/', authToken(), changePasswordValidation, validateRequest, async (req, res) => {

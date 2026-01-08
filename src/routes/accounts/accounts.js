@@ -122,65 +122,35 @@ router.delete('/delete/:id', authToken('IT'), deleteAccountValidation, validateR
     }
 });
 
+// Endpoint do aktualizacji danych użytkownika (bez hasła - użyj /auth/change-password do zmiany hasła)
 router.put('/update/', authToken('IT'), updateAccountValidation, validateRequest, async (req, res) => {
     const userId = req.user.user_id;
     const updates = req.body;
     
     try {
-        // Obsługa zmiany hasła - w transakcji z logowaniem
-        if (updates.current_password && updates.new_password) {
-            await db.transaction(async (t) => {
-                // Pobierz aktualny hash hasła z bazy
-                const user = await t.oneOrNone('SELECT password FROM users WHERE user_id = $1', [userId]);
-                if (!user) {
-                    throw new Error('User not found');
-                }
-                // Porównaj stare hasło
-                const isMatch = await userAuth.comparePasswords(updates.current_password, user.password);
-                if (!isMatch) {
-                    throw new Error('Nieprawidłowe obecne hasło');
-                }
-                // Zhashuj nowe hasło
-                const hashedPassword = await userAuth.hashPassword(updates.new_password);
-                // Zaktualizuj hasło w bazie
-                await t.none('UPDATE users SET password = $1 WHERE user_id = $2', [hashedPassword, userId]);
-                
-                // Loguj zmianę hasła
-                logger.info(`Użytkownik ${userId} zmienił hasło`);
-            });
-        }
-
-        // Aktualizacja innych pól (bez haseł)
+        // Aktualizacja pól profilu użytkownika (bez hasła)
         const allowedFields = ['first_name', 'last_name', 'email', 'phone_number'];
         const fields = Object.keys(updates).filter(field => allowedFields.includes(field));
         
-        if (fields.length > 0) {
-            const setStatements = fields.map((field, index) => `${field} = $${index + 1}`);
-            const query = `UPDATE users SET ${setStatements.join(', ')} WHERE user_id = $${fields.length + 1} RETURNING *`;
-            const values = [...fields.map(field => updates[field]), userId];
-            const updatedUser = await db.one(query, values);
-            return res.json({
-                status: 'success',
-                message: 'User updated successfully',
-                data: updatedUser
-            });
-        }
-
-        // Jeśli tylko hasło było zmieniane
-        if (updates.current_password && updates.new_password && fields.length === 0) {
-            return res.json({
-                status: 'success',
-                message: 'Password updated successfully',
-            });
-        }
-
-        // Jeśli nie było żadnych pól do aktualizacji
-        if (!updates.current_password && !updates.new_password && fields.length === 0) {
+        if (fields.length === 0) {
             return res.status(400).json({
                 status: 'error',
-                message: 'No valid fields to update'
+                message: 'No valid fields to update. Use /auth/change-password to change password.'
             });
         }
+        
+        const setStatements = fields.map((field, index) => `${field} = $${index + 1}`);
+        const query = `UPDATE users SET ${setStatements.join(', ')} WHERE user_id = $${fields.length + 1} RETURNING *`;
+        const values = [...fields.map(field => updates[field]), userId];
+        const updatedUser = await db.one(query, values);
+        
+        logger.info(`Użytkownik ${userId} zaktualizował dane profilu`);
+        
+        return res.json({
+            status: 'success',
+            message: 'User updated successfully',
+            data: updatedUser
+        });
         
     } catch (error) {
         logger.error(`Error updating user: ${error.message || error}`);

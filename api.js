@@ -9,6 +9,7 @@ const logger = require('./src/logger');
 const httpLogger = require('./src/middleware/loggingMiddleware/httpLogger');
 const mailer = require('./src/modules/mailingModules/mailer');
 const db = require('./src/modules/dbModules/db');
+const sendTestEmail = require('./src/services/mailService/mailService');
 
 // Opcjonalna konfiguracja SSL - jeśli certyfikaty są dostępne, użyj HTTPS, w przeciwnym razie HTTP
 let server;
@@ -129,7 +130,8 @@ try {
 }
 
 // Testowanie połączenia z serwerem email przy starcie
-mailer.testConnection();
+mailer.testConnection()
+
 
 // Inicjalizacja serwisów - użyj MqttService singleton
 const { mqttClient, io } = mqttService.initialize(server);

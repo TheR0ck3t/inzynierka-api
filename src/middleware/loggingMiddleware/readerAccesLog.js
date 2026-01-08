@@ -3,7 +3,7 @@ const logger = require('../../logger');
 
 const logAccess = async (req, res, next) => {
     const uid = req.params.uid;
-    const reader = req.headers.reader;
+    const device_id = req.headers.device_id;
     const status = req.accessStatus || 'PENDING';
     
     if (!uid) {
@@ -15,18 +15,20 @@ const logAccess = async (req, res, next) => {
         // Użyj widoku employee_info aby pobrać wszystkie dane naraz
         const employeeInfo = await db.oneOrNone('SELECT * FROM employee_info WHERE tag_id = $1', [uid]);
 
-        // Znajdź reader w tabeli readers
-        const readerData = await db.oneOrNone('SELECT * FROM readers WHERE name = $1', [reader]);
+        // Znajdź reader w tabeli readers (używamy device_id lub reader_name)
+        const readerData = await db.oneOrNone(
+            'SELECT device_id, reader_name FROM readers WHERE reader_name = $1 OR device_id = $1', 
+            [device_id]
+        );
         
         if (!readerData) {
-            // Jeśli reader nie istnieje, zwróć błąd
-            logger.error(`Reader not found: ${reader}`);
-            throw new Error(`Reader '${reader}' not found in database`);
+            // Jeśli reader nie istnieje, użyj reader jako reader_id (backward compatibility)
+            logger.warn(`Reader not found in database: ${device_id}, using raw value`);
         }
         
         const result = await db.one(
-            'INSERT INTO access_logs (tag_id, reader_id, action, status) VALUES ($1, $2, $3, $4) RETURNING access_id', 
-            [uid, readerData.reader_id, 'access', status]
+            'INSERT INTO access_logs (tag_id, device_id, action, status) VALUES ($1, $2, $3, $4) RETURNING access_id', 
+            [uid, readerData?.device_id || device_id, 'access', status]
         );
         const accessId = result.access_id;
         
@@ -34,9 +36,8 @@ const logAccess = async (req, res, next) => {
         const logData = {
             access_id: accessId,
             tag_id: uid,
-            reader_id: readerData.reader_id,
-            reader_name: readerData.name,
-            reader_location: readerData.location,
+            device_id: readerData?.device_id || device_id,
+            reader_name: readerData?.reader_name || device_id,
             timestamp: new Date().toISOString(),
             action: 'access',
             status: status,

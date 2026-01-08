@@ -16,8 +16,8 @@ function initialize(server) {
         const mqttConfig = {
             host: process.env.MQTT_BROKER_HOST || 'localhost',
             port: process.env.MQTT_BROKER_PORT || 1883,
-            username: process.env.MQTT_CONTROLLER_USERNAME,
-            password: process.env.MQTT_CONTROLLER_PASSWORD,
+            username: process.env.MQTT_USERNAME,
+            password: process.env.MQTT_PASSWORD,
             clientId: `api_${Date.now()}`,
             keepalive: 60,
             clean: true

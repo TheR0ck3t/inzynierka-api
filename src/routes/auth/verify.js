@@ -26,13 +26,13 @@ router.get('/email', async (req, res) => {
         logger.info(`E-mail zweryfikowany dla użytkownika ID: ${user_id}`);
         
         // Przekieruj użytkownika do frontendu z komunikatem sukcesu
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        const frontendUrl = process.env.FRONTEND_URL;
         res.redirect(`${frontendUrl}/?verified=true`);
     } catch (error) {
         logger.error(`Błąd weryfikacji e-maila: ${error.message || error}`);
         
         // Przekieruj do frontendu z komunikatem błędu
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        const frontendUrl = process.env.FRONTEND_URL;
         res.redirect(`${frontendUrl}/?verified=false&error=${encodeURIComponent(error.message || 'Invalid token')}`);
     }
 });

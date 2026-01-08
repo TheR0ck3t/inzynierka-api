@@ -45,6 +45,7 @@ const changePasswordValidation = [
 ];
 
 
+
 module.exports = {
     loginValidation,
     verify2FAValidation,
