@@ -63,11 +63,11 @@ function setupMqttSocketBridge({ mqttUrl, mqttConfig, server, db }) {
         });
         
         // Subskrybuj aktualizacje listy czytników
-        mqttClient.subscribe('readers/list_update', (err) => {
+        mqttClient.subscribe('readers/list', (err) => {
             if (err) {
-                logger.error(`Failed to subscribe to topic: readers/list_update - ${err.message}`);
+                logger.error(`Failed to subscribe to topic: readers/list - ${err.message}`);
             } else {
-                logger.info('Successfully subscribed to topic: readers/list_update');
+                logger.info('Successfully subscribed to topic: readers/list');
             }
         });
         
