@@ -1,6 +1,5 @@
 const db = require('../../modules/dbModules/db');
 const logger = require('../../logger');
-const { type } = require('os');
 
 const workTimeTracker = async (req, res, next) => {
     const uid = req.params.uid;
