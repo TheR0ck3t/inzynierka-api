@@ -12,29 +12,17 @@ const { addTagValidation, deleteTagValidation, enrollRfidValidation, updateSecre
 const validateRequest = require('../../middleware/validationMiddleware/validateRequest');
 // Tymczasowe przechowywanie danych enrollment
 let enrollmentSessions = new Map();
-// Tymczasowe przechowywanie rotacji sekretów (rotation_id -> { tagId, newSecret, expiresAt })
-let pendingRotations = new Map();
+// Per-tag rotation locks to avoid concurrent rotations for same tag
+const rotationLocks = new Map();
 
-// Cleanup wygasłych pendingRotations co 10s
-setInterval(() => {
-    const now = Date.now();
-    for (const [id, entry] of pendingRotations.entries()) {
-        if (entry.expiresAt <= now) {
-            pendingRotations.delete(id);
-            logger.info(`Pending rotation expired and removed: ${id}`);
-        }
-    }
-}, 10000);
+function acquireRotationLock(tagId) {
+    if (rotationLocks.has(tagId)) return false;
+    rotationLocks.set(tagId, true);
+    return true;
+}
 
-function generateSecret12() {
-    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    const charsLen = characters.length;
-    let secret = '';
-    const buf = crypto.randomBytes(12);
-    for (let i = 0; i < 12; i++) {
-        secret += characters[buf[i] % charsLen];
-    }
-    return secret;
+function releaseRotationLock(tagId) {
+    rotationLocks.delete(tagId);
 }
 
 router.get('/list', authToken('IT'), async (req, res) => {
@@ -287,9 +275,14 @@ router.delete('/delete/:tagId', authToken('IT'), deleteTagValidation, validateRe
     }
 });
 
-router.get('/check-access/:uid', mqttAuth, checkAccessValidation, validateRequest, async (req, res) => {
+router.get('/check-access/:uid', 
+    mqttAuth, // middleware autentykujące kontroler IoT
+    checkAccessValidation,  // walidacja danych wejściowych
+    validateRequest, // middleware do obsługi wyników walidacji
+    async (req, res) => { // główna logika endpointu
     const uid = req.params.uid;
-    const providedSecret = req.headers.secret // Secret może być w query lub header
+    const current_secret = req.headers.current_secret // Secret może być w query lub header
+    const new_secret = req.headers.new_secret;
 
     try {
         const tag = await db.oneOrNone('SELECT * FROM tags WHERE tag_id = $1', [uid]);
@@ -307,7 +300,7 @@ router.get('/check-access/:uid', mqttAuth, checkAccessValidation, validateReques
 
         // Sprawdź secret jeśli tag ma przypisany secret
         if (tag.tag_secret) {
-            if (!providedSecret) {
+            if (!current_secret) {
                 logger.warn(`Tag ${uid} requires secret but none provided`);
                 req.accessStatus = 'DENIED';
                 readerAccesLog(req, res, () => {}); // Zaloguj próbę dostępu bez secret
@@ -317,7 +310,7 @@ router.get('/check-access/:uid', mqttAuth, checkAccessValidation, validateReques
                 });
             }
             
-            if (tag.tag_secret !== providedSecret) {
+            if (tag.tag_secret !== current_secret) {
                 logger.warn(`Invalid secret for tag ${uid}`);
                 req.accessStatus = 'DENIED';
                 readerAccesLog(req, res, () => {}); // Zaloguj próbę dostępu z nieprawidłowym secret
@@ -346,33 +339,83 @@ router.get('/check-access/:uid', mqttAuth, checkAccessValidation, validateReques
             // if (!employee.is_active) { ... }
         }
 
+       
         logger.info(`Access granted for tag ${uid}`);
-        // Przyznaj dostęp i przygotuj rotację sekretu wygenerowanego po stronie serwera
-        const rotationId = `rot_${Date.now()}_${Math.floor(Math.random()*100000)}`;
-        const newSecret = generateSecret12();
-        // Oblicz HMAC dla rotacji (do weryfikacji przy potwierdzeniu)
-        const hmacKey = process.env.ROTATION_HMAC_KEY || 'default_rotation_key';
-        const rotHmac = crypto.createHmac('sha256', hmacKey).update(`${rotationId}|${newSecret}`).digest('hex');
-        // Zapisz rotację tymczasowo (ważna przez 30s)
-        pendingRotations.set(rotationId, {
-            tagId: uid,
-            newSecret: newSecret,
-            rotHmac: rotHmac,
-            expiresAt: Date.now() + 30000
-        });
-
         req.accessStatus = 'ALLOW';
         readerAccesLog(req, res, () => {}); // Zaloguj dostęp
         workTimeTracker(req, res, () => {}); // Śledzenie czasu pracy
 
+        // Immediate response to controller/device: ALLOW (rotation may follow)
+        const willAttemptRotation = !!new_secret;
         res.json({
             response: "ALLOW",
             employeeId: tag.employee_id,
             hasSecret: !!tag.tag_secret,
-            rotation_id: rotationId,
-            secret: newSecret,
-            rotation_hmac: rotHmac
+            rotationTriggered: willAttemptRotation
         });
+
+        // If rotation requested, start background blocking transaction that waits for device confirmation
+        if (willAttemptRotation) {
+            const mqttClient = mqttService.getMqttClient();
+            const reader_name = req.headers.reader_name;
+
+            // Non-blocking start
+            (async () => {
+                const lockAcquired = acquireRotationLock(uid);
+                if (!lockAcquired) {
+                    logger.warn(`Rotation already in progress for tag ${uid}`);
+                    return;
+                }
+                try {
+                    // Optionally resolve device_id for reader_name
+                    let device_id = null;
+                    try {
+                        if (reader_name) {
+                            const r = await db.oneOrNone('SELECT device_id FROM readers WHERE reader_name = $1', [reader_name]);
+                            if (r) device_id = r.device_id;
+                        }
+                    } catch (e) {
+                        logger.warn(`Failed to resolve device_id for reader ${reader_name}: ${e.message}`);
+                    }
+
+                    // Start transaction that keeps row locked until confirm/timeout
+                    await db.tx(async (t) => {
+                        // Lock the tag row to prevent concurrent modifications
+                        const tagRow = await t.oneOrNone('SELECT * FROM tags WHERE tag_id = $1 FOR UPDATE NOWAIT', [uid]);
+                        if (!tagRow) {
+                            throw new Error(`Tag ${uid} not found when attempting rotation`);
+                        }
+
+                        // Wait for device confirmation (default timeout 10s)
+                        try {
+                                const result = await mqttClient.waitForRotationConfirm(uid, device_id, reader_name, 15000);
+                                if (!result || result.success === false) {
+                                    throw new Error('Device reported failure or timeout during write');
+                                }
+                            } catch (err) {
+                            logger.warn(`Rotation for tag ${uid} failed or timed out: ${err.message}`);
+                            throw err; // cause rollback
+                        }
+
+                            // On success, use `new_secret` from request headers as source-of-truth
+                            if (!new_secret) {
+                                logger.error(`Rotation for tag ${uid} missing new_secret in request headers, cannot commit rotation`);
+                                throw new Error('No new_secret provided in request headers to commit');
+                            }
+                            // Log device payload for diagnostics but DO NOT rely on it for secret value
+                            const devicePayloadPreview = (typeof result === 'object' && result.payload) ? JSON.stringify(result.payload).slice(0,300) : null;
+                            logger.info(`Rotation for tag ${uid} committing secret from header 'new_secret'. Device payload preview: ${devicePayloadPreview}`);
+                            await t.none('UPDATE tags SET tag_secret = $1 WHERE tag_id = $2', [new_secret, uid]);
+                            logger.info(`Rotation for tag ${uid} committed in DB`);
+                    });
+                } catch (error) {
+                    logger.error(`Rotation transaction for tag ${uid} failed: ${error.message}`);
+                } finally {
+                    releaseRotationLock(uid);
+                }
+            })();
+        }
+
         
 
     } catch (error) {
@@ -385,11 +428,6 @@ router.get('/check-access/:uid', mqttAuth, checkAccessValidation, validateReques
     }
 });
 
-// Helper: apply tag secret and log actor
-async function applyTagSecret(tagId, newSecret, actor) {
-    await db.none('UPDATE tags SET tag_secret = $1 WHERE tag_id = $2', [newSecret, tagId]);
-    logger.info(`Secret updated for tag ${tagId} by ${actor}`);
-}
 
 // Endpoint do aktualizacji secret istniejącego tagu (uniwersalny - z autoryzacją i bez)
 router.put('/secret-update/:tagId', mqttAuth, updateSecretValidation, validateRequest, async (req, res) => {
@@ -399,16 +437,11 @@ router.put('/secret-update/:tagId', mqttAuth, updateSecretValidation, validateRe
     
     // Jeśli nie jest to request z kontrolera, sprawdź autoryzację
     if (!isControllerRequest) {
-        authToken(req, res, () => {
-            // Kontynuuj jeśli autoryzacja przeszła
+        return res.json({
+            error: 'Unauthorized',
+            message: 'This endpoint is reserved for internal use by the  controller'
         });
-        if (!req.user) {
-            return res.status(401).json({
-                error: 'Unauthorized',
-                message: 'Authentication required'
-            });
-        }
-    }
+        };
     
     if (!newSecret) {
         return res.status(400).json({
@@ -445,85 +478,6 @@ router.put('/secret-update/:tagId', mqttAuth, updateSecretValidation, validateRe
     }
 });
 
-// Endpoint przyjmujący potwierdzenie rotacji sekretu z urządzenia (przez MQTT bridge)
-router.post('/rfid/rotation-confirm', mqttAuth, async (req, res) => {
-    const { rotation_id, uid, device_id, source } = req.body;
-
-    if (!rotation_id || !uid) {
-        return res.status(400).json({ error: 'Missing rotation_id or uid' });
-    }
-
-    try {
-        const pending = pendingRotations.get(rotation_id);
-        if (!pending) {
-            return res.status(404).json({ error: 'Rotation not found or expired' });
-        }
-
-        if (pending.tagId !== uid) {
-            return res.status(400).json({ error: 'Rotation UID mismatch' });
-        }
-
-        // Weryfikuj HMAC jeśli został przesłany
-        const providedHmac = req.body.rotation_hmac;
-        if (!providedHmac || providedHmac !== pending.rotHmac) {
-            logger.warn(`Rotation HMAC mismatch for ${rotation_id} (provided: ${providedHmac})`);
-            return res.status(401).json({ error: 'Invalid rotation_hmac' });
-        }
-
-        // Zaktualizuj sekret w bazie danych
-        await db.none('UPDATE tags SET tag_secret = $1 WHERE tag_id = $2', [pending.newSecret, uid]);
-
-        // Usuń wpis pending
-        pendingRotations.delete(rotation_id);
-
-        logger.info(`Rotation confirmed for ${uid} (rotation_id=${rotation_id}) by device ${device_id}`);
-
-        res.json({ success: true, message: 'Rotation applied' });
-    } catch (error) {
-        logger.error(`Error confirming rotation: ${error.message}`);
-        res.status(500).json({ error: 'Internal server error', message: error.message });
-    }
-});
-
-// Endpoint przyjmujący informację o timeout'cie rotacji (urządzenie nie otrzymało odpowiedzi)
-router.post('/rfid/rotation-timeout', mqttAuth, async (req, res) => {
-    const { uid, device_id, rotation_id } = req.body;
-
-    if (!uid) {
-        return res.status(400).json({ error: 'Missing uid' });
-    }
-
-    try {
-        let removed = [];
-
-        if (rotation_id) {
-            const pending = pendingRotations.get(rotation_id);
-            if (pending && pending.tagId === uid) {
-                pendingRotations.delete(rotation_id);
-                removed.push(rotation_id);
-            }
-        } else {
-            // usuń wszystkie pending rotacje dla tego taga
-            for (const [rid, entry] of pendingRotations.entries()) {
-                if (entry.tagId === uid) {
-                    pendingRotations.delete(rid);
-                    removed.push(rid);
-                }
-            }
-        }
-
-        if (removed.length === 0) {
-            logger.info(`Rotation-timeout received for ${uid} but no pending rotations found`);
-            return res.json({ success: true, message: 'No pending rotations to cancel', removed: [] });
-        }
-
-        logger.info(`Cancelled pending rotations for ${uid} due to device timeout: ${removed.join(', ')}`);
-        return res.json({ success: true, message: 'Pending rotations cancelled', removed: removed });
-    } catch (error) {
-        logger.error(`Error handling rotation-timeout for ${uid}: ${error.message}`);
-        return res.status(500).json({ error: 'Internal server error', message: error.message });
-    }
-});
 
 module.exports = {
    path: '/tags',

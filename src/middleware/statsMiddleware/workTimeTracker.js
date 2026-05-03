@@ -3,14 +3,14 @@ const logger = require('../../logger');
 
 const workTimeTracker = async (req, res, next) => {
     const uid = req.params.uid;
-    const reader = req.headers.reader;
+    const reader_name = req.headers.reader_name;
 
-    if (!uid || !reader) {
-        logger.warn('Brakujący UID lub reader w workTimeTracker');
+    if (!uid || !reader_name) {
+        logger.warn('Brakujący UID lub reader_name w workTimeTracker');
         return next();
     }
 
-    if (reader === 'mainEntrance' || reader === 'mainExit') {
+    if (reader_name === 'mainEntrance' || reader_name === 'mainExit') {
         try {
             const employee = await db.oneOrNone('SELECT employee_id FROM tags WHERE tag_id = $1', [uid]);
             const employeeId = employee ? employee.employee_id : null;
@@ -23,7 +23,7 @@ const workTimeTracker = async (req, res, next) => {
             const activeSession = await db.oneOrNone('SELECT * FROM work_sessions WHERE employee_id = $1 AND shift_end IS NULL', [employeeId]);
             let statusChanged = false;
 
-            if (reader === 'mainEntrance') {
+            if (reader_name === 'mainEntrance') {
                 if (!activeSession) {
                     // Rozpocznij nową sesję tylko na wejściu
                     await db.none('INSERT INTO work_sessions (employee_id, shift_start) VALUES ($1, NOW())', [employeeId]);
@@ -32,7 +32,7 @@ const workTimeTracker = async (req, res, next) => {
                 } else {
                     logger.info(`Sesja pracy już aktywna dla UID: ${uid} - pomijanie skanu wejścia`);
                 }
-            } else if (reader === 'mainExit') {
+            } else if (reader_name === 'mainExit') {
                 if (activeSession) {
                     // Zakończ sesję tylko na wyjściu i tylko jeśli istnieje
                     await db.none('UPDATE work_sessions SET shift_end = NOW() WHERE session_id = $1', [activeSession.session_id]);
@@ -49,7 +49,7 @@ const workTimeTracker = async (req, res, next) => {
                     const { emitStatusUpdate } = require('../../services/webSocketService/employeesStatusWebSocket');
                     emitStatusUpdate({
                         employee_id: employeeId,
-                        action: reader === 'mainEntrance' ? 'started_work' : 'ended_work',
+                        action: reader_name === 'mainEntrance' ? 'started_work' : 'ended_work',
                         timestamp: new Date().toISOString()
                     });
                 } catch (wsError) {
@@ -58,7 +58,7 @@ const workTimeTracker = async (req, res, next) => {
             }
 
         } catch (error) {
-            logger.error(`Błąd śledzenia czasu pracy dla UID: ${uid}, Czytnik: ${reader}: ${error.message}`);
+            logger.error(`Błąd śledzenia czasu pracy dla UID: ${uid}, Czytnik: ${reader_name}: ${error.message}`);
         }
     }
     next();

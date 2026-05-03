@@ -1,10 +1,12 @@
 const logger = require('../../logger');
+const { namespaceJwtAuth } = require('./socketAuth');
 
 let readersListNamespace = null;
 
 function setupReadersListWebSocket(io) {
     logger.info(`Ustawianie WebSocket dla /readers-list namespace`);
     readersListNamespace = io.of('/readers-list');
+    readersListNamespace.use(namespaceJwtAuth({ namespaceName: '/readers-list' }));
     readersListNamespace.on('connection', (socket) => {
         logger.info(`Klient połączony z namespace /readers-list: ${socket.id}`);
         

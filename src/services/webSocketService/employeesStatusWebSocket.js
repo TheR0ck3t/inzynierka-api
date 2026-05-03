@@ -1,10 +1,12 @@
 const logger = require('../../logger');
+const { namespaceJwtAuth } = require('./socketAuth');
 
 let employeesStatusNamespace = null;
 
 function setupEmployeesStatusWebSocket(io) {
     logger.info('Setting up employeesStatusWebSocket...');
     employeesStatusNamespace = io.of('/employees-status');
+    employeesStatusNamespace.use(namespaceJwtAuth({ namespaceName: '/employees-status', allowedDepartments: ['HR', 'IT'] }));
     
     employeesStatusNamespace.on('connection', (socket) => {
         logger.info(`Client connected to /employees-status namespace: ${socket.id}`);

@@ -1,7 +1,9 @@
 const logger = require('../../logger');
+const { namespaceApiKeyAuth } = require('./socketAuth');
 
 function setupRfidControllerNamespace(io, connectedClients, handleCardScanned, handleStatusUpdate) {
     const rfidNamespace = io.of('/rfid');
+    rfidNamespace.use(namespaceApiKeyAuth({ namespaceName: '/rfid' }));
     rfidNamespace.on('connection', (socket) => {
         logger.info(`Kontroler RFID connected via /rfid namespace: ${socket.id}`);
         connectedClients.set(socket.id, { type: 'esp', socket });

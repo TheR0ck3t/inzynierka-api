@@ -3,19 +3,21 @@ const { Server } = require('socket.io');
 const logger = require('../../logger');
 const { getNamespace: getReadersListNamespace } = require('../webSocketService/readersListWebSocket');
 
-function setupMqttSocketBridge({ mqttUrl, mqttConfig, server, db }) {
-    // Use secure MQTT config if provided, otherwise fallback to URL
-    const mqttClient = mqttConfig ? mqtt.connect(mqttConfig) : mqtt.connect(mqttUrl);
+function setupMqttSocketBridge({ mqttUrl, mqttConfig, server, db, mqttClient: providedMqttClient, io: providedIo }) {
+    // Allow passing existing mqttClient/io for separation of concerns.
+    // Fallback to creating them if not provided (keeps backward compatibility).
+    const mqttClient = providedMqttClient || (mqttConfig ? mqtt.connect(mqttConfig) : mqtt.connect(mqttUrl));
+    const allowedOrigin = process.env.FRONTEND_URL || 'http://localhost:5173';
     
-    const io = new Server(server, {
+    const io = providedIo || new Server(server, {
         cors: {
-            origin: process.env.FRONTEND_URL || '*',
+            origin: allowedOrigin,
             methods: ['GET', 'POST']
         },
         pingTimeout: 60000,
         pingInterval: 25000,
         upgradeTimeout: 30000,
-        maxHttpBufferSize: 1e8,
+        maxHttpBufferSize: 1e6,
         transports: ['websocket', 'polling'],
         allowUpgrades: true
     });
@@ -79,20 +81,25 @@ function setupMqttSocketBridge({ mqttUrl, mqttConfig, server, db }) {
                 logger.info('Successfully subscribed to topic: readers/status_changed');
             }
         });
+        // Subskrybuj potwierdzenia rotacji
+        mqttClient.subscribe('rfid/rotation', (err) => {
+            if (err) logger.error(`Failed to subscribe to topic: rfid/rotation - ${err.message}`);
+            else logger.info('Successfully subscribed to topic: rfid/rotation');
+        });
     });
     mqttClient.on('message', async (topic, messageBuffer) => {
         const message = messageBuffer.toString();
-        logger.info(`Received MQTT message on topic ${topic}: ${message.substring(0, 200)}...`);
+        // logger.info(`Received MQTT message on topic ${topic}: ${message.substring(0, 200)}...`);
         
         try {
             const parts = topic.split('/');
-            let deviceId, uid;
+            let device_id, uid;
             
             if (parts[0] === 'controller' && parts[1] === 'keyCard') {
                 // Handle keyCard messages
                 const payload = JSON.parse(message);
                 
-                deviceId = payload.deviceId;
+                device_id = payload.device_id;
                 uid = payload.uid;
             }
             
@@ -100,11 +107,11 @@ function setupMqttSocketBridge({ mqttUrl, mqttConfig, server, db }) {
                 // Handle status messages
                 const statusData = JSON.parse(message);
                 
-                deviceId = statusData.deviceId;
+                device_id = statusData.device_id;
                 // Status nie potrzebuje dalszej obsługi z cardScanned
                 return;
             }
-            else if (parts[0] === 'readers' && parts[1] === 'list_update') {
+            else if (parts[0] === 'readers' && (parts[1] === 'list' || parts[1] === 'list_update')) {
                 // Handle reader registry updates from kontroler
                 const readers_list = JSON.parse(message);
                 
@@ -114,7 +121,7 @@ function setupMqttSocketBridge({ mqttUrl, mqttConfig, server, db }) {
                 const readersListNamespace = getReadersListNamespace();
                 if (readersListNamespace) {
                     readersListNamespace.emit('readers_list', readers_list);
-                    logger.info(`Emitted readers_list event to /readers-list namespace`);
+
                 } else {
                     logger.warn('readers-list namespace not initialized yet');
                 }
@@ -130,7 +137,6 @@ function setupMqttSocketBridge({ mqttUrl, mqttConfig, server, db }) {
                 const readersListNamespace = getReadersListNamespace();
                 if (readersListNamespace) {
                     readersListNamespace.emit('readers_status_changed', statusData);
-                    logger.info(`Emitted readers_status_changed event to /readers-list namespace`);
                 } else {
                     logger.warn('readers-list namespace not initialized yet');
                 }
@@ -150,18 +156,21 @@ function setupMqttSocketBridge({ mqttUrl, mqttConfig, server, db }) {
                 logger.info(`Calling API: POST ${apiUrl}/tags/rfid/save`);
                 
                 try {
-                    const response = await axios.post(`${apiUrl}/tags/rfid/save`, {
-                        headers: {
-                            'x-mqtt-api-key': process.env.MQTT_API_KEY
-                        },
-                        data: {
+                    const response = await axios.post(
+                        `${apiUrl}/tags/rfid/save`,
+                        {
                             reader: reader,
                             tagId: tagId,
                             sessionId: sessionId,
-                            tagSecret: newSecret, // Dodaj secret do żądania
-                            secretWritten: secretWritten // Informacja czy secret został zapisany na karcie
+                            tagSecret: newSecret,
+                            secretWritten: secretWritten
+                        },
+                        {
+                            headers: {
+                                'x-mqtt-api-key': process.env.MQTT_API_KEY
+                            }
                         }
-                    });
+                    );
 
                     logger.info(`API response success: ${JSON.stringify(response.data)}`);
                     
@@ -189,11 +198,32 @@ function setupMqttSocketBridge({ mqttUrl, mqttConfig, server, db }) {
                 }
                 return;
             }
+            else if (parts[0] === 'rfid' && parts[1] === 'rotation') {
+                try {
+                    const payload = JSON.parse(message);
+                    const tagUid = payload.uid || payload.tagId;
+                    const devId = payload.device_id || payload.deviceId || payload.device || '';
+                    const rname = payload.reader_name || payload.reader || '';
+
+                    const tryKeys = [ _rotationKey(tagUid, devId, rname), _rotationKey(tagUid, devId, ''), _rotationKey(tagUid, '', rname), _rotationKey(tagUid, '', '') ];
+                    for (const k of tryKeys) {
+                        const waiter = mqttClient._pendingRotationWaiters.get(k);
+                        if (waiter) {
+                            waiter({ success: payload.success !== false, payload });
+                            logger.info(`Resolved rotation waiter for key ${k}`);
+                            break;
+                        }
+                    }
+                } catch (err) {
+                    logger.error(`Error processing rfid/rotation message: ${err.message}`);
+                }
+                return;
+            }
 
             // Obsługa cardScanned - tylko dla keyCard messages
-            if (deviceId && uid) {
+            if (device_id && uid) {
                 // Broadcast do wszystkich klientów WebSocket
-                io.emit('cardScanned', { uid, deviceId });
+                io.emit('cardScanned', { uid, device_id });
             }
             
         } catch (error) {
@@ -204,6 +234,41 @@ function setupMqttSocketBridge({ mqttUrl, mqttConfig, server, db }) {
     mqttClient.on('error', (err) => {
         logger.error(`MQTT error: ${err.message}`);
     });
+
+    // --- Rotation confirmation waiter map ---
+    mqttClient._pendingRotationWaiters = new Map();
+
+    // Helper to build key
+    function _rotationKey(tagId, device_id, reader_name) {
+        return `${tagId}::${device_id || ''}::${reader_name || ''}`;
+    }
+
+    // Expose helper to wait for rotation confirmation
+    mqttClient.waitForRotationConfirm = function waitForRotationConfirm(tagId, device_id, reader_name, timeoutMs = 10000) {
+        return new Promise((resolve, reject) => {
+            const key = _rotationKey(tagId, device_id, reader_name);
+            if (mqttClient._pendingRotationWaiters.has(key)) {
+                return reject(new Error('rotation_in_progress'));
+            }
+
+            let settled = false;
+            const timer = setTimeout(() => {
+                if (settled) return;
+                settled = true;
+                mqttClient._pendingRotationWaiters.delete(key);
+                reject(new Error('rotation_timeout'));
+            }, timeoutMs);
+
+            mqttClient._pendingRotationWaiters.set(key, (payload) => {
+                if (settled) return;
+                settled = true;
+                clearTimeout(timer);
+                mqttClient._pendingRotationWaiters.delete(key);
+                resolve(payload);
+            });
+        });
+    };
+
 
     // socket.io events
     io.on('connection', (socket) => {

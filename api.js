@@ -38,7 +38,7 @@ const cookieParser = require('cookie-parser');
 
 // Import serwisów
 const mqttService = require('./src/services/mqttService/mqttService');
-const webSocketService = require('./src/services/webSocketService/websocket');
+const webSocketService = require('./src/services/webSocketService/websocketService');
 const statsScheduler = require('./src/services/statsService/statsScheduler');
 
 // Konfiguracja proxy - ufaj nagłówkom proxy aby poprawnie odczytywać IP klienta
@@ -133,11 +133,11 @@ try {
 mailer.testConnection()
 
 
-// Inicjalizacja serwisów - użyj MqttService singleton
-const { mqttClient, io } = mqttService.initialize(server);
+// Inicjalizacja serwisów - użyj MqttService singleton (tworzy tylko klienta MQTT)
+const { mqttClient } = mqttService.initialize();
 
-// Zintegruj dodatkowe funkcje WebSocket
-webSocketService.initialize(io, mqttClient);
+// Zainicjalizuj WebSocket (tworzy `io`) i zintegruj z MQTT
+webSocketService.initialize(server, mqttClient);
 
 // Inicjalizacja scheduled jobs dla statystyk
 statsScheduler.init();

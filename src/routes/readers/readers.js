@@ -1,10 +1,13 @@
-const express = require('express');
-const router = express.Router();
-const db = require('../../modules/dbModules/db');
-const logger = require('../../logger');
+const express = require('express'); // Import frameworka Express
+const router = express.Router(); // Utworzenie routera dla endpointów związanych z czytnikami
+const db = require('../../modules/dbModules/db'); // Import modułu do obsługi bazy danych
+const authToken = require('../../middleware/authMiddleware/authToken'); // Middleware do autoryzacji tokenem JWT
+const { addReaderValidation, updateReaderValidation } = require('../../validators/readerValidators'); // Import walidatorów dla danych czytnika
+const validateRequest = require('../../middleware/validationMiddleware/validateRequest'); // Middleware do obsługi wyników walidacji danych wejściowych
+const logger = require('../../logger'); // Import modułu do logowania zdarzeń i błędów
 
 // GET /readers - Pobierz zarejestrowane czytniki z bazy
-router.get('/list', async (req, res) => {
+router.get('/list', authToken('IT'), async (req, res) => {
     try {
         const data = await db.query('SELECT device_id, reader_name FROM readers ORDER BY device_id');
         res.json({ data});
@@ -15,7 +18,7 @@ router.get('/list', async (req, res) => {
 });
 
 // POST /readers - Dodaj czytnik do bazy (IT worker kliknął "Add")
-router.post('/', async (req, res) => {
+router.post('/', authToken('IT'), addReaderValidation, validateRequest, async (req, res) => {
     const { device_id, reader_name } = req.body;
     console.log(req.body)
     
@@ -38,7 +41,7 @@ router.post('/', async (req, res) => {
 });
 
 // PUT /api/readers/:id - Zmień nazwę czytnika
-router.put('/:id', async (req, res) => {
+router.put('/:id', authToken('IT'), updateReaderValidation, validateRequest, async (req, res) => {
     const { id } = req.params;
     const { reader_name } = req.body;
     
@@ -61,7 +64,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // DELETE /api/readers/:id - Usuń czytnik z bazy
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authToken('IT'), async (req, res) => {
     const { id } = req.params;
     
     try {

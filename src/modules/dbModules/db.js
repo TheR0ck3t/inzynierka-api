@@ -3,7 +3,7 @@ const logger = require('../../logger');
 // Konfiguracja połączenia z bazą danych
 const dbConfig = {
     host: process.env.DB_HOST,
-    port: process.env.DB_PORT,
+    port: parseInt(process.env.DB_PORT),
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
@@ -17,10 +17,10 @@ const dbConfig = {
 const initOptions = {
     error(err, e) {
         if (e.cn) {
-            logger.error(`Błąd połączenia z bazą: ${err.message}`);
+            logger.error(`Błąd połączenia z bazą: ${err.code || err.message}`);
         }
         if (e.query) {
-            logger.error(`Błąd zapytania: ${err.message}`);
+            logger.error(`Błąd zapytania: ${err.code || err.message}`);
         }
     }
 };
@@ -63,15 +63,13 @@ async function healthCheck() {
         `);
         return {
             status: 'healthy',
-            database: dbConfig.database,
             serverTime: result.current_time,
             uptime: parseFloat(result.uptime)
         };
     } catch (error) {
         return {
             status: 'unhealthy',
-            database: dbConfig.database,
-            error: error.message
+            error: 'Database unavailable'
         };
     }
 }

@@ -1,10 +1,12 @@
 const logger = require('../../logger');
+const { namespaceJwtAuth } = require('./socketAuth');
 
 let accessLogsNamespace = null;
 
 function setupAccessLogsWebSocket(io) {
     logger.info(`Ustawianie WebSocket dla /access-logs namespace`);
     accessLogsNamespace = io.of('/access-logs');
+    accessLogsNamespace.use(namespaceJwtAuth({ namespaceName: '/access-logs', allowedDepartments: ['IT'] }));
     accessLogsNamespace.on('connection', (socket) => {
         logger.info(`Klient połączony z namespace /access-logs: ${socket.id}`);
         socket.on('get_logs', (logData) => {

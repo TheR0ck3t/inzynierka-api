@@ -3,7 +3,7 @@ const logger = require('../../logger');
 
 const logAccess = async (req, res, next) => {
     const uid = req.params.uid;
-    const device_id = req.headers.device_id;
+    const reader_name = req.headers.reader_name;
     const status = req.accessStatus || 'PENDING';
     
     if (!uid) {
@@ -14,21 +14,22 @@ const logAccess = async (req, res, next) => {
     try {
         // Użyj widoku employee_info aby pobrać wszystkie dane naraz
         const employeeInfo = await db.oneOrNone('SELECT * FROM employee_info WHERE tag_id = $1', [uid]);
-
         // Znajdź reader w tabeli readers (używamy device_id lub reader_name)
         const readerData = await db.oneOrNone(
-            'SELECT device_id, reader_name FROM readers WHERE reader_name = $1 OR device_id = $1', 
-            [device_id]
+            'SELECT device_id FROM readers WHERE reader_name = $1', 
+            [reader_name]
         );
+
+        const device_id = readerData ? readerData.device_id : null;
         
-        if (!readerData) {
+        if (!device_id) {
             // Jeśli reader nie istnieje, użyj reader jako reader_id (backward compatibility)
-            logger.warn(`Reader not found in database: ${device_id}, using raw value`);
+            logger.warn(`Reader not found in database: ${reader_name}, using raw value`);
         }
         
         const result = await db.one(
             'INSERT INTO access_logs (tag_id, device_id, action, status) VALUES ($1, $2, $3, $4) RETURNING access_id', 
-            [uid, readerData?.device_id || device_id, 'access', status]
+            [uid, device_id, 'access', status]
         );
         const accessId = result.access_id;
         

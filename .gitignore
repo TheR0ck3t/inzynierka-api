@@ -4,6 +4,6 @@ node_modules
 Dockerfile
 *.log
 sql
-.sql
+*.sql
 generate-test-user.js
 logs

@@ -21,7 +21,7 @@ const welcomeTemplate = (firstName, lastName, tempPassword, verification_token) 
           <p><strong>Ważne:</strong> Ze względów bezpieczeństwa, zalecamy zmianę hasła po pierwszym logowaniu.</p>
           
           <div style="margin: 30px 0; text-align: center;">
-            <a href="${process.env.BACKEND_URL || 'http://localhost:5123'}/api/auth/verify/email?token=${verification_token}" 
+            <a href="${process.env.BACKEND_URL || 'http://localhost:5173'}/api/auth/verify/email?token=${verification_token}" 
                style="background-color: #007bff; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
               Zweryfikuj email i aktywuj konto
             </a>
