@@ -281,9 +281,7 @@ router.get('/check-access/:uid',
     validateRequest, // middleware do obsługi wyników walidacji
     async (req, res) => { // główna logika endpointu
     const uid = req.params.uid;
-    const current_secret = req.headers.current_secret // Secret może być w query lub header
-    const new_secret = req.headers.new_secret;
-
+    const { current_secret, new_secret, reader_name } = req.query; // Pobierz dane z query
     try {
         const tag = await db.oneOrNone('SELECT * FROM tags WHERE tag_id = $1', [uid]);
         
@@ -357,7 +355,6 @@ router.get('/check-access/:uid',
         // If rotation requested, start background blocking transaction that waits for device confirmation
         if (willAttemptRotation) {
             const mqttClient = mqttService.getMqttClient();
-            const reader_name = req.headers.reader_name;
 
             // Non-blocking start
             (async () => {
@@ -378,35 +375,35 @@ router.get('/check-access/:uid',
                         logger.warn(`Failed to resolve device_id for reader ${reader_name}: ${e.message}`);
                     }
 
-                    // Start transaction that keeps row locked until confirm/timeout
+                    // Uruchom transakcję, która blokuje wiersz do czasu potwierdzenia lub timeout'u
                     await db.tx(async (t) => {
-                        // Lock the tag row to prevent concurrent modifications
+                        // Zablokuj wiersz tagu (FOR UPDATE NOWAIT) aby uniemożliwić konkurencyjne modyfikacje
                         const tagRow = await t.oneOrNone('SELECT * FROM tags WHERE tag_id = $1 FOR UPDATE NOWAIT', [uid]);
                         if (!tagRow) {
-                            throw new Error(`Tag ${uid} not found when attempting rotation`);
+                            throw new Error(`Tag ${uid} nie znaleziony podczas rotacji`);
                         }
 
-                        // Wait for device confirmation (default timeout 10s)
+                        // Czekaj na potwierdzenie z urządzenia (timeout 15 sekund)
                         try {
                                 const result = await mqttClient.waitForRotationConfirm(uid, device_id, reader_name, 15000);
                                 if (!result || result.success === false) {
-                                    throw new Error('Device reported failure or timeout during write');
+                                    throw new Error('Urządzenie zgłosiło błąd lub timeout podczas zapisu');
                                 }
                             } catch (err) {
-                            logger.warn(`Rotation for tag ${uid} failed or timed out: ${err.message}`);
-                            throw err; // cause rollback
+                            logger.warn(`Rotacja dla tagu ${uid} się nie powiodła lub timeout: ${err.message}`);
+                            throw err; // Spowoduj rollback transakcji
                         }
 
-                            // On success, use `new_secret` from request headers as source-of-truth
+                            // Po potwierdzeniu - użyj `new_secret` z nagłówków HTTP jako źródło prawdy
                             if (!new_secret) {
-                                logger.error(`Rotation for tag ${uid} missing new_secret in request headers, cannot commit rotation`);
-                                throw new Error('No new_secret provided in request headers to commit');
+                                logger.error(`Rotacja dla tagu ${uid} brakuje new_secret w nagłówkach HTTP, nie można zacommitować rotacji`);
+                                throw new Error('Brak new_secret w nagłówkach HTTP do zacommitowania');
                             }
-                            // Log device payload for diagnostics but DO NOT rely on it for secret value
+                            // Zaloguj payload z urządzenia do diagnostyki, ale NIE opieraj się na nim dla wartości sekretu
                             const devicePayloadPreview = (typeof result === 'object' && result.payload) ? JSON.stringify(result.payload).slice(0,300) : null;
-                            logger.info(`Rotation for tag ${uid} committing secret from header 'new_secret'. Device payload preview: ${devicePayloadPreview}`);
+                            logger.info(`Rotacja dla tagu ${uid} commituje sekret z nagłówka 'new_secret'. Podgląd payloadu z urządzenia: ${devicePayloadPreview}`);
                             await t.none('UPDATE tags SET tag_secret = $1 WHERE tag_id = $2', [new_secret, uid]);
-                            logger.info(`Rotation for tag ${uid} committed in DB`);
+                            logger.info(`Rotacja dla tagu ${uid} zacommitowana w bazie danych`);
                     });
                 } catch (error) {
                     logger.error(`Rotation transaction for tag ${uid} failed: ${error.message}`);

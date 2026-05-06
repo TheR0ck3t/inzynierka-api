@@ -44,10 +44,16 @@ const changePasswordValidation = [
         .custom(noSQLInjection)
 ];
 
+const enable2FAValidation = [
+    // No body parameters required for 2FA enable
+    // User ID comes from authenticated request (req.user)
+];
+
 
 
 module.exports = {
     loginValidation,
     verify2FAValidation,
-    changePasswordValidation
+    changePasswordValidation,
+    enable2FAValidation
 };

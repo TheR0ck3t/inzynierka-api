@@ -3,7 +3,7 @@ const logger = require('../../logger');
 
 const workTimeTracker = async (req, res, next) => {
     const uid = req.params.uid;
-    const reader_name = req.headers.reader_name;
+    const reader_name = req.query.reader_name;
 
     if (!uid || !reader_name) {
         logger.warn('Brakujący UID lub reader_name w workTimeTracker');

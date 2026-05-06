@@ -5,10 +5,11 @@ const jwt = require('jsonwebtoken');
 const { comparePasswords } = require('../../modules/authModules/userAuth');
 const { loginValidation } = require('../../validators/validators');
 const validateRequest = require('../../middleware/validationMiddleware/validateRequest');
+const loginRateLimiter = require('../../middleware/authMiddleware/loginRateLimiter');
 const logger = require('../../logger');
 
 // Endpoint do logowania
-router.post('/', loginValidation, validateRequest, async(req, res) => {
+router.post('/', loginRateLimiter, loginValidation, validateRequest, async(req, res) => {
     const { email, password, token2fa } = req.body;
     try {
         // Sprawdzenie, czy użytkownik istnieje i jest aktywny

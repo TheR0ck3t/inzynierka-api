@@ -67,18 +67,18 @@ const addEmployeeValidation = [
             
             return true;
         }),
-    body('employment_type_id')
+    body('department_id')
         .trim()
-        .notEmpty().withMessage('Typ zatrudnienia jest wymagany!')
-        .isInt({ gt: 0 }).withMessage('Typ zatrudnienia musi być dodatnią liczbą całkowitą!')
+        .notEmpty().withMessage('Dział jest wymagany!')
+        .isInt({ gt: 0 }).withMessage('Dział musi być dodatnią liczbą całkowitą!')
         .custom(strictNumeric)
         .custom(async (value) => {
-            const employmentType = await db.oneOrNone(
-                'SELECT * FROM employment_types WHERE employment_type_id = $1 AND employment_is_active = true',
+            const department = await db.oneOrNone(
+                'SELECT department_id FROM departments WHERE department_id = $1',
                 [value]
             );
-            if (!employmentType) {
-                throw new Error('Wybrana forma zatrudnienia nie istnieje lub jest nieaktywna');
+            if (!department) {
+                throw new Error('Wybrany dział nie istnieje');
             }
             return true;
         })
@@ -106,19 +106,19 @@ const updateEmployeeValidation = [
         .isLength({ min: 2, max: 50 }).withMessage('Nazwisko musi mieć od 2 do 50 znaków!')
         .matches(/^[A-Za-zÀ-ÖØ-öø-ÿ '-]+$/).withMessage('Nazwisko może zawierać tylko litery, spacje, apostrofy i myślniki!')
         .custom(noSQLInjection),
-    body('employment_type_id')
+    body('department_id')
         .optional()
         .trim()
-        .notEmpty().withMessage('Typ zatrudnienia nie może być pusty!')
+        .notEmpty().withMessage('Dział nie może być pusty!')
         .isInt({ gt: 0 }).withMessage('Typ zatrudnienia musi być dodatnią liczbą całkowitą!')
         .custom(strictNumeric)
         .custom(async (value) => {
-            const employmentType = await db.oneOrNone(
-                'SELECT * FROM employment_types WHERE employment_type_id = $1 AND employment_is_active = true',
+            const department = await db.oneOrNone(
+                'SELECT department_id FROM departments WHERE department_id = $1',
                 [value]
             );
-            if (!employmentType) {
-                throw new Error('Wybrana forma zatrudnienia nie istnieje lub jest nieaktywna');
+            if (!department) {
+                throw new Error('Wybrany dział nie istnieje');
             }
             return true;
         })

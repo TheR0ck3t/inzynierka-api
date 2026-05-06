@@ -3,7 +3,7 @@ const logger = require('../../logger');
 
 const logAccess = async (req, res, next) => {
     const uid = req.params.uid;
-    const reader_name = req.headers.reader_name;
+    const reader_name = req.query.reader_name;
     const status = req.accessStatus || 'PENDING';
     
     if (!uid) {

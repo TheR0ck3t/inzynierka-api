@@ -2,44 +2,47 @@ const { body, param } = require('express-validator');
 const { noSQLInjection, strictNumeric, safeFreeText } = require('./sqlSanitizer');
 
 const addReaderValidation = [
-    body('name')
+    body('device_id')
+        .trim()
+        .notEmpty().withMessage('ID urządzenia jest wymagane!')
+        .isLength({ min: 1, max: 100 }).withMessage('ID urządzenia musi mieć od 1 do 100 znaków!')
+        .matches(/^[A-Za-z0-9_-]+$/).withMessage('ID urządzenia może zawierać tylko litery, cyfry, myślniki i podkreślenia!')
+        .custom(noSQLInjection),
+    body('reader_name')
         .trim()
         .notEmpty().withMessage('Nazwa czytnika jest wymagana!')
         .isLength({ min: 1, max: 100 }).withMessage('Nazwa czytnika musi mieć od 1 do 100 znaków!')
-        .custom(safeFreeText)
-        .custom(noSQLInjection),
-    body('location')
-        .trim()
-        .notEmpty().withMessage('Lokalizacja czytnika jest wymagana!')
-        .isLength({ min: 1, max: 255 }).withMessage('Lokalizacja czytnika musi mieć od 1 do 255 znaków!')
         .custom(safeFreeText)
         .custom(noSQLInjection)
 ];
 
 const updateReaderValidation = [
-    param('readerId')
+    param('id')
         .trim()
-        .notEmpty().withMessage('ID czytnika jest wymagane!')
-        .isInt({ gt: 0 }).withMessage('ID czytnika musi być dodatnią liczbą całkowitą!')
-        .custom(strictNumeric)
+        .notEmpty().withMessage('ID urządzenia jest wymagane!')
+        .isLength({ min: 1, max: 100 }).withMessage('ID urządzenia musi mieć od 1 do 100 znaków!')
+        .matches(/^[A-Za-z0-9_-]+$/).withMessage('ID urządzenia może zawierać tylko litery, cyfry, myślniki i podkreślenia!')
         .custom(noSQLInjection),
-    body('name')
+    body('reader_name')
         .optional()
         .trim()
         .notEmpty().withMessage('Nazwa czytnika nie może być pusta!')
         .isLength({ min: 1, max: 100 }).withMessage('Nazwa czytnika musi mieć od 1 do 100 znaków!')
         .custom(safeFreeText)
-        .custom(noSQLInjection),
-    body('location')
-        .optional()
+        .custom(noSQLInjection)
+];
+
+const deleteReaderValidation = [
+    param('id')
         .trim()
-        .notEmpty().withMessage('Lokalizacja czytnika nie może być pusta!')
-        .isLength({ min: 1, max: 255 }).withMessage('Lokalizacja czytnika musi mieć od 1 do 255 znaków!')
-        .custom(safeFreeText)
+        .notEmpty().withMessage('ID urządzenia jest wymagane!')
+        .isLength({ min: 1, max: 100 }).withMessage('ID urządzenia musi mieć od 1 do 100 znaków!')
+        .matches(/^[A-Za-z0-9_-]+$/).withMessage('ID urządzenia może zawierać tylko litery, cyfry, myślniki i podkreślenia!')
         .custom(noSQLInjection)
 ];
 
 module.exports = {
     addReaderValidation,
-    updateReaderValidation
+    updateReaderValidation,
+    deleteReaderValidation
 };

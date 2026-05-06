@@ -4,6 +4,10 @@ const logger = require('../../logger');
 // Middleware do autoryzacji kontrolera IoT za pomocą klucza API
 module.exports = async (req, res, next) => {
     const apiKey = req.headers['x-mqtt-api-key']; // Pobranie klucza API z niestandardowego nagłówka
+    const isController = req.headers['x-controller-request'] === 'true'; // Sprawdzenie, czy nagłówek informuje o żądaniu z kontrolera
+    if (!isController) {
+        return res.status(403).json({ error: 'Forbidden' }); // Odpowiedź 403 Forbidden, jeśli nagłówek nie wskazuje na żądanie z kontrolera
+    }
     if (!apiKey || apiKey !== process.env.MQTT_API_KEY) {
         logger.warn('MQTT authentication failed - invalid or missing API key'); // Logowanie nieudanej próby autoryzacji
         return res.status(403).json({ error: 'Forbidden' }); // Odpowiedź 403 Forbidden, jeśli klucz API jest nieprawidłowy lub nie został dostarczony

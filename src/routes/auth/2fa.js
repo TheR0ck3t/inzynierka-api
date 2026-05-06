@@ -4,6 +4,7 @@ const authToken = require('../../middleware/authMiddleware/authToken');
 const db = require('../../modules/dbModules/db');
 const logger = require('../../logger');
 const { generateSecret, generateQRCode, verify2FA  } = require('../../modules/2faModules/2fa');
+const { enable2FAValidation } = require('../../validators/authValidators');
 const validateRequest = require('../../middleware/validationMiddleware/validateRequest');
 
 
@@ -25,7 +26,7 @@ router.get('/status', authToken(), validateRequest, async (req, res) => {
     }
 });
 
-router.post('/enable', authToken(), validateRequest, async (req, res) => {
+router.post('/enable', authToken(), enable2FAValidation, validateRequest, async (req, res) => {
     logger.info(`Włączanie 2FA dla użytkownika: ${req.user.email} (ID: ${req.user.user_id})`);
     const userId = req.user.user_id;
     try {

@@ -46,7 +46,7 @@ async function verify2FA(secret, token) {
     logger.info(`Verifying 2FA token`);
     try {
         const totp = new TOTP({
-            secret: Secret.fromBase32(secret), // Jak w GitHub
+            secret: Secret.fromBase32(secret),
             algorithm: 'SHA256',
             digits: 6,
             period: 30,

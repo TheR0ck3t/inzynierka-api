@@ -46,12 +46,12 @@ router.get('/list', authToken('IT','HR'), async (req, res) => {
 });
 
 router.post('/add', authToken('HR'), addEmployeeValidation, validateRequest,  async (req, res) => {
-    const { first_name, last_name, dob, employment_date, employment_type_id } = req.body;
-    // Używamy tekstu zapytania z bezpośrednimi parametrami
-    const query =  'INSERT INTO employees (first_name, last_name, dob, employment_date, employment_type_id) VALUES ($1, $2, $3, $4, $5) RETURNING *'
-    const values =  [first_name, last_name, dob, employment_date, employment_type_id];
+    const { first_name, last_name, dob, employment_date, department_id } = req.body;
     try {
-        const data = await db.one(query,values);
+        // Używamy tekstu zapytania z bezpośrednimi parametrami
+        const query = 'INSERT INTO employees (first_name, last_name, dob, employment_date, department_id) VALUES ($1, $2, $3, $4, $5) RETURNING *';
+        const values = [first_name, last_name, dob, employment_date, department_id];
+        const data = await db.one(query, values);
         res.json({
             status: 'success',
             message: 'Employee added successfully!',
@@ -121,31 +121,29 @@ router.put('/update/:id', authToken('IT','HR'), updateEmployeeValidation, valida
     const updates = req.body;
 
     try {
-        const allowedFields = ['first_name', 'last_name', 'keycard_id','employment_type_id', 'department_id', 'job_title'];
+        // Tylko zezwolone pola mogą być aktualizowane
+        const allowedFields = ['first_name', 'last_name', 'keycard_id', 'department_id', 'job_title'];
         const fields = Object.keys(updates).filter(field => allowedFields.includes(field));
-        if (fields.length > 0) {
-            const setStatements = fields.map((field, index) => `${field} = $${index + 1}`);
-            const query = `UPDATE employees SET ${setStatements.join(', ')} WHERE employee_id = $${fields.length + 1} RETURNING *`;
-            const values = [...fields.map(field => updates[field]), employeeId];
-            const updatedEmployee = await db.one(query, values);
-            try {
-                return res.json({
-                status: 'success',
-                message: 'Employee updated successfully',
-                data: updatedEmployee
-            });
-            } catch (error) {
-                logger.error(`Błąd zwracania odpowiedzi po aktualizacji pracownika: ${error.message || error}`);
-            }
-        }
-
-        // Jeśli nie było żadnych pól do aktualizacji
-        if (!updates.current_password && !updates.new_password && fields.length === 0) {
+        
+        if (fields.length === 0) {
             return res.status(400).json({
                 status: 'error',
-                message: 'No valid fields to update'
+                message: 'Żadne pola do aktualizacji'
             });
         }
+
+        // Dynamiczne budowanie zapytania UPDATE z parametryzacją
+        const setStatements = fields.map((field, index) => `${field} = $${index + 1}`);
+        const query = `UPDATE employees SET ${setStatements.join(', ')} WHERE employee_id = $${fields.length + 1} RETURNING *`;
+        const values = [...fields.map(field => updates[field]), employeeId];
+        
+        const updatedEmployee = await db.one(query, values);
+        
+        res.json({
+            status: 'success',
+            message: 'Employee updated successfully',
+            data: updatedEmployee
+        });
     } catch (error) {
         logger.error(`Błąd aktualizacji pracownika: ${error.message || error}`);
         res.status(500).json({
