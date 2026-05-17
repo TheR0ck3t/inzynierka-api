@@ -47,6 +47,7 @@ router.get('/list', authToken('IT','HR'), async (req, res) => {
 
 router.post('/add', authToken('HR'), addEmployeeValidation, validateRequest,  async (req, res) => {
     const { first_name, last_name, dob, employment_date, department_id } = req.body;
+    console.log ()
     try {
         // Używamy tekstu zapytania z bezpośrednimi parametrami
         const query = 'INSERT INTO employees (first_name, last_name, dob, employment_date, department_id) VALUES ($1, $2, $3, $4, $5) RETURNING *';
@@ -100,7 +101,15 @@ router.get('/:id', authToken('IT','HR'), getEmployeeValidation, validateRequest,
     const employeeId = req.params.id;
 
     try {
-        const data = await db.one('SELECT * FROM employee_info WHERE employee_id = $1', [employeeId]);
+        const data = await db.oneOrNone('SELECT * FROM employee_info WHERE employee_id = $1 LIMIT 1', [employeeId]);
+
+        if (!data) {
+            return res.status(404).json({
+                status: 'error',
+                message: 'Employee not found'
+            });
+        }
+
         res.json({
             status: 'success',
             message: 'Fetched employee successfully',

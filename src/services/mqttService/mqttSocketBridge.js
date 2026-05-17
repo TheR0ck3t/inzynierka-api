@@ -145,29 +145,35 @@ function setupMqttSocketBridge({ mqttUrl, mqttConfig, server, db, mqttClient: pr
             else if (parts[0] === 'rfid' && parts[1] === 'enrolled') {
                 // Handle new card enrolled from ESP32
                 const enrollData = JSON.parse(message);
-                const { reader, tagId, sessionId, newSecret, secretWritten } = enrollData;
+                const { reader, reader_name, tagId, sessionId, newSecret, secretWritten } = enrollData;
+                const normalizedReader = reader || reader_name;
                 
-                logger.info(`Received rfid/enrolled: reader=${reader}, tagId=${tagId}, sessionId=${sessionId}, hasSecret=${!!newSecret}, secretWritten=${!!secretWritten}`);
+                logger.info(`Received rfid/enrolled: reader=${normalizedReader}, tagId=${tagId}, sessionId=${sessionId}, hasSecret=${!!newSecret}, secretWritten=${!!secretWritten}`);
                 
                 // Wyślij zapytanie do API o zapisanie karty
                 const axios = require('axios');
-                const apiUrl = process.env.API_URL;
+                const apiUrl = process.env.API_URL || `http://localhost:${process.env.PORT || 2137}`;
+                const savePayload = {
+                    reader: normalizedReader,
+                    tagId: tagId,
+                    sessionId: sessionId,
+                    secretWritten: secretWritten
+                };
+
+                if (typeof newSecret === 'string' && newSecret.trim().length > 0) {
+                    savePayload.tagSecret = newSecret;
+                }
                 
                 logger.info(`Calling API: POST ${apiUrl}/tags/rfid/save`);
                 
                 try {
                     const response = await axios.post(
                         `${apiUrl}/tags/rfid/save`,
-                        {
-                            reader: reader,
-                            tagId: tagId,
-                            sessionId: sessionId,
-                            tagSecret: newSecret,
-                            secretWritten: secretWritten
-                        },
+                        savePayload,
                         {
                             headers: {
-                                'x-mqtt-api-key': process.env.MQTT_API_KEY
+                                'x-mqtt-api-key': process.env.MQTT_API_KEY,
+                                'x-controller-request': 'true'
                             }
                         }
                     );
@@ -178,13 +184,13 @@ function setupMqttSocketBridge({ mqttUrl, mqttConfig, server, db, mqttClient: pr
                     io.emit('cardEnrolled', {
                         success: true,
                         tagId: tagId,
-                        reader: reader,
+                        reader: normalizedReader,
                         hasSecret: !!newSecret,
                         secretWritten: !!secretWritten,
                         message: 'Card enrolled successfully'
                     });
                     
-                    logger.info(`Card enrolled successfully: ${tagId} for reader ${reader} with secret (written: ${!!secretWritten})`);
+                    logger.info(`Card enrolled successfully: ${tagId} for reader ${normalizedReader} with secret (written: ${!!secretWritten})`);
                 } catch (error) {
                     logger.error(`API call failed: ${error.message}`);
                     logger.error(`API response: ${error.response?.status} - ${JSON.stringify(error.response?.data)}`);
@@ -192,8 +198,8 @@ function setupMqttSocketBridge({ mqttUrl, mqttConfig, server, db, mqttClient: pr
                     io.emit('cardEnrolled', {
                         success: false,
                         tagId: tagId,
-                        reader: reader,
-                        error: error.response?.data?.message || 'Failed to save card'
+                        reader: normalizedReader,
+                        error: error.response?.data?.message || error.response?.data?.error || 'Failed to save card'
                     });
                 }
                 return;

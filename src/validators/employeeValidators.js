@@ -7,13 +7,13 @@ const addEmployeeValidation = [
         .trim()
         .notEmpty().withMessage('Imię jest wymagane!')
         .isLength({ min: 2, max: 50 }).withMessage('Imię musi mieć od 2 do 50 znaków!')
-        .matches(/^[A-Za-zÀ-ÖØ-öø-ÿ '-]+$/).withMessage('Imię może zawierać tylko litery, spacje, apostrofy i myślniki!')
+        .matches(/^[A-Za-zÀ-ÖØ-öø-ÿĄąĆćĘęŁłŃńÓóŚśŹźŻż '-]+$/u).withMessage('Imię może zawierać tylko litery, spacje, apostrofy i myślniki!')
         .custom(noSQLInjection),
     body('last_name')
         .trim()
         .notEmpty().withMessage('Nazwisko jest wymagane!')
         .isLength({ min: 2, max: 50 }).withMessage('Nazwisko musi mieć od 2 do 50 znaków!')
-        .matches(/^[A-Za-zÀ-ÖØ-öø-ÿ '-]+$/).withMessage('Nazwisko może zawierać tylko litery, spacje, apostrofy i myślniki!')
+        .matches(/^[A-Za-zÀ-ÖØ-öø-ÿĄąĆćĘęŁłŃńÓóŚśŹźŻż '-]+$/u).withMessage('Nazwisko może zawierać tylko litery, spacje, apostrofy i myślniki!')
         .custom(noSQLInjection),
     body('dob')
         .trim()
@@ -97,14 +97,14 @@ const updateEmployeeValidation = [
         .trim()
         .notEmpty().withMessage('Imię nie może być puste!')
         .isLength({ min: 2, max: 50 }).withMessage('Imię musi mieć od 2 do 50 znaków!')
-        .matches(/^[A-Za-zÀ-ÖØ-öø-ÿ '-]+$/).withMessage('Imię może zawierać tylko litery, spacje, apostrofy i myślniki!')
+        .matches(/^[A-Za-zÀ-ÖØ-öø-ÿĄąĆćĘęŁłŃńÓóŚśŹźŻż '-]+$/u).withMessage('Imię może zawierać tylko litery, spacje, apostrofy i myślniki!')
         .custom(noSQLInjection),
     body('last_name')
         .optional()
         .trim()
         .notEmpty().withMessage('Nazwisko nie może być puste!')
         .isLength({ min: 2, max: 50 }).withMessage('Nazwisko musi mieć od 2 do 50 znaków!')
-        .matches(/^[A-Za-zÀ-ÖØ-öø-ÿ '-]+$/).withMessage('Nazwisko może zawierać tylko litery, spacje, apostrofy i myślniki!')
+        .matches(/^[A-Za-zÀ-ÖØ-öø-ÿĄąĆćĘęŁłŃńÓóŚśŹźŻż '-]+$/u).withMessage('Nazwisko może zawierać tylko litery, spacje, apostrofy i myślniki!')
         .custom(noSQLInjection),
     body('department_id')
         .optional()

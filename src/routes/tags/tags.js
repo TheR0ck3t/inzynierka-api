@@ -119,7 +119,6 @@ router.post('/rfid/enroll', authToken('IT'), enrollRfidValidation, validateReque
                 enrollmentSessions.delete(reader);
             }
         }, 30000);
-        
         // Wyślij komendę do ESP32 przez MQTT: "start_enrollment"
         const topic = 'rfid/command';
         const command = JSON.stringify({
@@ -254,7 +253,7 @@ router.delete('/delete/:tagId', authToken('IT'), deleteTagValidation, validateRe
 
     try {
         // Usuń kartę RFID z bazy danych
-        await db.none('DELETE FROM tags WHERE tag_id = $1', [tagId]);
+        // await db.none('DELETE FROM tags WHERE tag_id = $1', [tagId]);
         
         // Usuń przypisanie karty z pracownika
         await db.none('UPDATE employees SET keycard_id = NULL WHERE keycard_id = $1', [tagId]);

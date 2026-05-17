@@ -1,5 +1,3 @@
-
-const { setupMqttSocketBridge } = require('./mqttSocketBridge');
 const mqtt = require('mqtt');
 const db = require('../../modules/dbModules/db');
 const logger = require('../../logger');
@@ -50,7 +48,7 @@ function getSocketIO() {
 }
 
 function isReady() {
-    return isInitialized && mqttClient && io;
+    return Boolean(isInitialized && mqttClient && mqttClient.connected);
 }
 
 module.exports = {
