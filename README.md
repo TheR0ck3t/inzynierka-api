@@ -1,19 +1,38 @@
 # Inżynierka API
 
-Backend API do systemu zarządzania pracownikami - projekt inżynierski.
+Backend API do systemu zarządzania pracownikami - **projekt stworzony w ramach pracy inżynierskiej**.
+
+## 📚 O Projekcie
+
+Backend będący częścią zaawansowanego systemu do zarządzania dostępem pracowników z integracją RFID, komunikacji MQTT, obsługą 2FA i API REST do komunikacji z frontendem oraz mikrokontrolerami.
 
 ## 🚀 Technologie
 
+### Podstawowe
 - **Node.js** - środowisko uruchomieniowe JavaScript
 - **Express.js 4.21.2** - framework webowy
-- **PostgreSQL** - baza danych
-- **pg-promise 11.10.2** - driver PostgreSQL
-- **JWT (jsonwebtoken 9.0.2)** - autoryzacja
-- **bcrypt 6.0.0** - hashowanie haseł
-- **Winston 3.17.0** - logowanie
-- **CORS 2.8.5** - obsługa cross-origin requests
-- **OTPAuth 9.4.0** - obsługa TOTP (2FA)
-- **QRCode 1.5.4** - generowanie kodów QR dla 2FA
+- **PostgreSQL 12+** - baza danych relacyjna
+- **pg-promise 11.10.2** - sterownik PostgreSQL
+
+### Autoryzacja i Bezpieczeństwo
+- **JWT (jsonwebtoken 9.0.2)** - autoryzacja tokenowa
+- **bcrypt 6.0.0** - hashowanie haseł (10 rund soli)
+- **OTPAuth 9.4.0** - TOTP (hasła jednorazowe oparte na czasie) dla 2FA
+- **QRCode 1.5.4** - generowanie kodów QR
+- **express-validator 7.2.1** - walidacja żądań
+- **express-rate-limit 8.5.0** - ograniczenie liczby żądań
+
+### Komunikacja w Czasie Rzeczywistym
+- **Socket.IO 4.8.1** - WebSocket dla aktualizacji na żywo
+- **MQTT 5.14** - komunikacja z czytnikami ESP32
+
+### Narzędzia
+- **Axios 1.8.2** - klient HTTP
+- **Winston 3.17.0** - logowanie z rotacją
+- **Nodemailer 8.0.5** - wysyłanie wiadomości e-mail
+- **node-cron 4.2.1** - zaplanowane zadania
+- **CORS 2.8.5** - obsługa żądań z różnych źródeł
+- **cookie-parser 1.4.7** - zarządzanie ciasteczkami
 
 ## 📋 Wymagania
 
@@ -82,126 +101,291 @@ npm start
 
 API będzie dostępne na `http://localhost:3000`
 
-## 📁 Struktura projektu
+## 📁 Struktura Projektu
 
 ```
 src/
-├── modules/
-│   ├── authModules/        # Moduły autoryzacji
-│   │   └── userAuth.js     # Hashowanie i weryfikacja haseł
-│   ├── 2faModules/         # Moduły 2FA
-│   │   └── 2fa.js          # TOTP, generowanie QR kodów
-│   └── dbModules/
-│       └── db.js           # Konfiguracja bazy danych
 ├── middleware/
-│   └── authToken.js        # Middleware JWT
+│   ├── authToken.js            # Weryfikacja JWT
+│   ├── validateRequest.js       # Centralna walidacja
+│   ├── logAccess.js            # Logowanie dostępu
+│   ├── workTimeTracker.js      # Śledzenie czasu pracy
+│   └── mqttAuth.js             # Autoryzacja MQTT
+├── modules/
+│   ├── authModules/
+│   │   └── userAuth.js         # Hashing, weryfikacja haseł
+│   ├── 2faModules/
+│   │   └── 2fa.js              # TOTP, generowanie kodów QR
+│   └── dbModules/
+│       └── db.js               # Konfiguracja PostgreSQL
 ├── routes/
-│   ├── accounts/           # Endpointy zarządzania kontami
-│   │   └── accounts.js     # CRUD użytkowników
-│   ├── auth/               # Endpointy autoryzacji
-│   │   ├── login.js        # Logowanie (z obsługą 2FA)
-│   │   ├── logout.js       # Wylogowanie
-│   │   ├── check.js        # Sprawdzanie sesji
-│   │   └── 2fa.js          # Endpointy 2FA (QR kody, weryfikacja)
-│   └── employees/          # Endpointy zarządzania pracownikami
-│       └── employees.js    # CRUD pracowników
-├── logs/                   # Pliki logów (tworzone automatycznie)
-│   ├── combined.log        # Wszystkie logi
-│   └── error.log           # Tylko błędy
-└── logger.js               # Konfiguracja Winston
-.env.example                # Przykładowy plik konfiguracyjny
-api.js                      # Główny plik aplikacji
-generate-test-user.js       # Skrypt generowania użytkowników testowych
+│   ├── auth/                   # Trasowanie autoryzacji
+│   │   ├── login.js            # POST /auth/login
+│   │   ├── logout.js           # POST /auth/logout
+│   │   ├── check.js            # GET /auth/check
+│   │   └── 2fa.js              # Punkty końcowe 2FA
+│   ├── accounts/               # Zarządzanie kontami
+│   │   └── accounts.js         # CRUD użytkowników
+│   ├── employees/              # Zarządzanie pracownikami
+│   │   └── employees.js        # CRUD pracowników
+│   ├── rfid/                   # RFID
+│   │   ├── enrollment.js       # Enrolowanie kart
+│   │   ├── access.js           # Weryfikacja dostępu
+│   │   └── tags.js             # Zarządzanie tagami
+│   └── logs/                   # Logi dostępu
+│       └── accessLogs.js       # Historia dostępu
+├── services/
+│   ├── mqttService.js          # Klient brokera MQTT
+│   ├── socketService.js        # Menedżer Socket.IO
+│   ├── websocketBridge.js      # Most MQTT → WebSocket
+│   └── statsScheduler.js       # Zadania cron
+├── validators/
+│   ├── authValidators.js       # Walidacja logowania, hasła, 2FA
+│   ├── accountValidators.js    # Walidacja CRUD kont
+│   ├── employeeValidators.js   # Walidacja CRUD pracowników
+│   └── tagsValidators.js       # Walidacja tagów RFID
+├── logger.js                   # Konfiguracja loggera Winston
+└── api.js                      # Główny plik aplikacji
+
+logs/                           # Pliki dziennika (tworzone automatycznie)
+├── combined.log                # Wszystkie logi
+├── error.log                   # Tylko błędy
+generate-test-user.js           # Generator użytkownika testowego
+.env.example                    # Szablon zmiennych środowiskowych
 ```
 
 ## 🔐 API Endpointy
 
-### Autoryzacja
-- `POST /auth/login` - Logowanie użytkownika
-- `POST /auth/logout` - Wylogowanie użytkownika
-- `GET /auth/check` - Sprawdzanie stanu sesji
-- `POST /auth/2fa/enable` - Dodawanie 2FA
-- `POST /auth/2fa/disable` - Usuwanie 2FA
+### Autoryzacja (`/auth`)
+| Endpoint | Metoda | Opis | Auth |
+|----------|--------|------|---------| 
+| `/auth/login` | POST | Logowanie użytkownika (z 2FA) | ❌ |
+| `/auth/logout` | POST | Wylogowanie | ✅ |
+| `/auth/check` | GET | Sprawdzenie sesji | ✅ |
+| `/auth/2fa/enable` | POST | Włączenie 2FA + QR kod | ✅ |
+| `/auth/2fa/disable` | POST | Wyłączenie 2FA | ✅ |
+| `/auth/2fa/verify` | POST | Weryfikacja kodu 2FA | ❌ |
 
-### Zarządzanie kontami
-- `GET /accounts/` - Lista wszystkich użytkowników (wymagana autoryzacja)
-- `POST /accounts/create` - Tworzenie nowego użytkownika (wymagana autoryzacja)
-- `PUT /accounts/update/` - Aktualizacja danych użytkownika (wymagana autoryzacja)
-- `DELETE /accounts/delete/:id` - Usunięcie użytkownika (wymagana autoryzacja)
+### Zarządzanie Kontami (`/accounts`)
+| Endpoint | Metoda | Opis | Auth |
+|----------|--------|------|---------| 
+| `/accounts/` | GET | Lista użytkowników | ✅ |
+| `/accounts/create` | POST | Tworzenie konta | ✅ |
+| `/accounts/update/:id` | PUT | Aktualizacja konta | ✅ |
+| `/accounts/delete/:id` | DELETE | Usunięcie konta | ✅ |
+| `/accounts/changePassword` | PUT | Zmiana hasła | ✅ |
 
-### Zarządzanie pracownikami
-- `GET /employees/` - Lista wszystkich pracowników (wymagana autoryzacja)
-- `POST /employees/add` - Dodawanie nowego pracownika (wymagana autoryzacja)
-- `PUT /employees/update/` - Aktualizacja danych pracownika (wymagana autoryzacja)
-- `DELETE /employees/delete/:id` - Usunięcie pracownika (wymagana autoryzacja)
+### Zarządzanie Pracownikami (`/employees`)
+| Endpoint | Metoda | Opis | Auth |
+|----------|--------|------|---------| 
+| `/employees/` | GET | Lista pracowników | ✅ |
+| `/employees/add` | POST | Dodanie pracownika | ✅ |
+| `/employees/update/:id` | PUT | Aktualizacja pracownika | ✅ |
+| `/employees/delete/:id` | DELETE | Usunięcie pracownika | ✅ |
+| `/employees/:id` | GET | Szczegóły pracownika | ✅ |
+
+### RFID & Enrolowanie (`/rfid`)
+| Endpoint | Metoda | Opis | Auth |
+|----------|--------|------|---------| 
+| `/rfid/enrollment/start` | POST | Start enrolowania karty | ✅ |
+| `/rfid/enrollment/save` | POST | Zapis scannowanej karty | ✅ |
+| `/rfid/access/check` | POST | Weryfikacja dostępu (z MQTT) | ✅ |
+| `/rfid/tags` | GET | Lista kart pracownika | ✅ |
+| `/rfid/tags/add` | POST | Dodanie karty | ✅ |
+| `/rfid/tags/delete/:id` | DELETE | Usunięcie karty | ✅ |
+| `/rfid/secret/rotate` | POST | Rotacja sekretów dostępu | ✅ |
+
+### Logi Dostępu (`/logs`)
+| Endpoint | Metoda | Opis | Auth |
+|----------|--------|------|---------| 
+| `/logs/access` | GET | Historia dostępu | ✅ |
+| `/logs/access/:id` | GET | Szczegóły logu | ✅ |
+
+### Przestrzenie nazw WebSocket
+| Namespace | Typ | Opis |
+|-----------|------|-------|
+| `/access-logs` | Socket.IO | Logi dostępu w czasie rzeczywistym |
+| `/rfid` | Socket.IO | Komunikacja z kontrolerami |
+| `/employees-status` | Socket.IO | Status pracowników (obecność) |
+
+## � Endpointy Publiczne
 
 ### Publiczne
-- Brak publicznych endpointów (wszystkie wymagają autoryzacji)
+- `POST /auth/login` - Logowanie użytkownika (z 2FA)
+- `POST /auth/2fa/verify` - Weryfikacja kodu 2FA
 
-## 🔒 Autoryzacja
+## 🔒 Bezpieczeństwo
 
-API wykorzystuje JWT (JSON Web Tokens) do autoryzacji:
-- Tokeny są przesyłane w ciasteczkach HTTP (`token`)
-- Middleware `authToken` sprawdza ważność tokenów dla chronionych endpointów
-- Hasła są zabezpieczone przez bcrypt z saltRounds= `BCRYPT_ROUNDS`
-- Czas wygaśnięcia tokena konfigurowalny przez `JWT_EXPIRES_IN`
+### Autoryzacja
+- **JWT (JSON Web Tokens)** - tokeny w ciasteczkach HTTP
+- **2FA (TOTP)** - dwuskładnikowa autoryzacja z kodami czasowymi
+- **Middleware `authToken`** - weryfikacja JWT na chronionych endpointach
+- **Timeout sesji** - automatyczne wylogowanie po `SESSION_TIMEOUT`
 
+### Hashing Haseł
+- **bcrypt** - saltRounds = `BCRYPT_ROUNDS` (default: 10)
+- Wymogi hasła: 8+ znaków, duże/małe litery, cyfra, znak specjalny
 
-## 🗄️ Baza danych
+### Rate Limiting
+- Limit requestów na IP
+- Ochrona przed brute-force atakami
 
-### Schemat tabeli `users`
-```sql
-CREATE TABLE users (
-    id SERIAL PRIMARY KEY,
-    email VARCHAR(255) NOT NULL UNIQUE,
-    password VARCHAR(255) NOT NULL,
-    two_factor_secret VARCHAR(255),
-    first_name VARCHAR(50),
-    last_name VARCHAR(50),
-    created_at TIMESTAMP DEFAULT NOW(),
-    last_login TIMESTAMP,
-    phone_number VARCHAR(15),
-    is_active BOOLEAN DEFAULT FALSE
-);
+### MQTT Security
+- Autoryzacja MQTT clients
+- Middleware `mqttAuth` do weryfikacji komend
+
+### Zmienne Bezpieczeństwa
+```bash
+JWT_SECRET=min_64_characters_long_for_security
+JWT_EXPIRES_IN=1h
+BCRYPT_ROUNDS=10
+SESSION_TIMEOUT=3600000  # 1 godzina
 ```
 
-### Schemat tabeli `employees`
+## 🗄️ Baza Danych
+
+Pełny schemat dostępny w `migrations/`
+
+### Główne Tabele
+
+**users** - Konta użytkowników
 ```sql
-CREATE TABLE employees (
-    employee_id SERIAL PRIMARY KEY,
-    first_name VARCHAR(50) NOT NULL,
-    last_name VARCHAR(50) NOT NULL,
-    dob DATE,
-    employment_date DATE,
-    keycard_id VARCHAR(50) UNIQUE,
-    created_at TIMESTAMP DEFAULT NOW()
-);
+id SERIAL PRIMARY KEY
+email VARCHAR(255) UNIQUE NOT NULL
+password VARCHAR(255) NOT NULL
+two_factor_secret VARCHAR(255)  -- TOTP secret
+first_name VARCHAR(50)
+last_name VARCHAR(50)
+phone_number VARCHAR(15)
+is_active BOOLEAN DEFAULT true
+created_at TIMESTAMP DEFAULT NOW()
+last_login TIMESTAMP
 ```
 
-## 🛡️ Bezpieczeństwo
+**employees** - Pracownicy
+```sql
+employee_id SERIAL PRIMARY KEY
+first_name VARCHAR(50) NOT NULL
+last_name VARCHAR(50) NOT NULL
+dob DATE
+employment_date DATE NOT NULL
+employment_type VARCHAR(20)  -- PERMANENT, TEMPORARY, INTERN
+user_id INTEGER REFERENCES users(id)
+created_at TIMESTAMP DEFAULT NOW()
+```
 
-- **Hashowanie haseł**: bcrypt z salt rounds = 10
-- **JWT**: zabezpieczone tokeny z ekspiracją (konfigurowalny czas przez `JWT_EXPIRES_IN`)
-- **CORS**: skonfigurowane dla cross-origin requests
-- **Zmienne środowiskowe**: wrażliwe dane zabezpieczone w pliku .env
-- **Middleware autoryzacji**: `authToken` chroni wszystkie endpointy
+**rfid_tags** - Karty dostępu
+```sql
+tag_id SERIAL PRIMARY KEY
+employee_id INTEGER REFERENCES employees(employee_id)
+tag_uid VARCHAR(50) UNIQUE NOT NULL
+secret VARCHAR(255)  -- Access token
+status VARCHAR(20)  -- ACTIVE, REVOKED, EXPIRED
+enrolled_at TIMESTAMP DEFAULT NOW()
+```
 
-## 🔧 Narzędzia deweloperskie
+**access_logs** - Historia dostępu
+```sql
+log_id SERIAL PRIMARY KEY
+employee_id INTEGER REFERENCES employees(employee_id)
+reader_id VARCHAR(50)  -- mainEntrance, mainExit, etc.
+access_status VARCHAR(20)  -- ALLOWED, DENIED
+scanned_at TIMESTAMP DEFAULT NOW()
+```
+
+**work_sessions** - Śledzenie czasu pracy
+```sql
+session_id SERIAL PRIMARY KEY
+employee_id INTEGER REFERENCES employees(employee_id)
+shift_start TIMESTAMP
+shift_end TIMESTAMP
+total_hours DECIMAL(5,2)
+created_at TIMESTAMP DEFAULT NOW()
+```
+
+## � Konfiguracja (.env)
+
+```bash
+# Serwer
+PORT=3000
+NODE_ENV=development
+FRONTEND_URL=http://localhost:5173
+
+# PostgreSQL
+DB_HOST=localhost
+DB_PORT=5432
+DB_USER=postgres
+DB_PASSWORD=your_password
+DB_NAME=inzynierka_db
+
+# JWT & Bezpieczeństwo
+JWT_SECRET=your_secret_min_64_chars_long_for_security
+JWT_EXPIRES_IN=1h
+BCRYPT_ROUNDS=10
+SESSION_TIMEOUT=3600000
+
+# 2FA
+COMPANY_NAME="Nazwa Twojej Firmy"
+
+# MQTT (opcjonalnie)
+MQTT_BROKER_URL=mqtt://localhost:1883
+MQTT_USERNAME=user
+MQTT_PASSWORD=password
+
+# Email (dla notyfikacji)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your_email@gmail.com
+SMTP_PASS=your_app_password
+```
+
+## 🔧 Narzędzia Developerskie
 
 ### Generowanie użytkowników testowych
 ```bash
 node generate-test-user.js
 ```
 
-### Monitoring logów
+Tworzy testowego użytkownika z włączonym 2FA.
+
+### Monitorowanie logów
 ```bash
+# Wszystkie logi
 tail -f src/logs/combined.log
+
+# Tylko błędy
+tail -f src/logs/error.log
 ```
 
-## 🚦 Kody odpowiedzi HTTP
 
-- `200` - OK (sukces)
-- `400` - Bad Request (błędne dane)
-- `401` - Unauthorized (brak autoryzacji)
-- `404` - Not Found (nie znaleziono)
-- `500` - Internal Server Error (błąd serwera)
+## 📡 Integracja z Innymi Komponentami
+
+### Frontend (inzynierka-front)
+- HTTP REST API
+- WebSocket (Socket.IO) dla live updates
+- 2FA QR code generation
+
+### Kontroler RFID (inzynierka-kontroler)
+- MQTT topics (`rfid/*`)
+- REST API callbacks
+- JWT authentication
+
+### ESP32 Readers
+- MQTT v5 protocol
+- Enrolowanie kart
+- Rotacja sekretów
+
+## 🚦 Kody Odpowiedzi HTTP
+
+| Kod | Opis |
+|-----|------|
+| `200` | ✅ OK - Sukces |
+| `201` | ✅ Created - Zasób utworzony |
+| `400` | ❌ Bad Request - Błędne dane wejściowe |
+| `401` | ❌ Unauthorized - Brak autoryzacji / 2FA wymagane |
+| `403` | ❌ Forbidden - Brak uprawnień |
+| `404` | ❌ Not Found - Zasób nie znaleziony |
+| `409` | ❌ Conflict - Konflikt (np. email już istnieje) |
+| `422` | ❌ Unprocessable Entity - Walidacja nie powiodła się |
+| `429` | ⚠️ Too Many Requests - Rate limit |
+| `500` | ❌ Internal Server Error - Błąd serwera |
